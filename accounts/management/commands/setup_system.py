@@ -81,6 +81,8 @@ class Command(BaseCommand):
         )
         user.role = "SUPERADMIN"
         user.must_change_password = True
+        user.is_staff = True
+        user.is_superuser = True
         user.save()
 
         # Write password to file (do not overwrite if file already exists)
