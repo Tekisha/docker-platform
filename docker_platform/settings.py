@@ -31,6 +31,8 @@ ALLOWED_HOSTS = []
 # Application definition
 AUTH_USER_MODEL='accounts.User'
 
+LOGIN_REDIRECT_URL = "/accounts/profile/"
+
 INSTALLED_APPS = [
     'accounts',
     'registry',
