@@ -1,7 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 
-from . import views_admin
+from . import views_admin, views_profile
 from .views import ForcedPasswordChangeView
 
 urlpatterns = [
@@ -14,5 +14,6 @@ urlpatterns = [
 
     path("admin/users/", views_admin.admin_user_list, name="admin_user_list"),
     path("admin/users/<uuid:user_id>/publisher-status/", views_admin.set_publisher_status, name="set_publisher_status"),
+    path("profile/", views_profile.profile, name="profile"),
 
 ]
