@@ -1,0 +1,102 @@
+@startuml
+' ============================
+' Core domain model: DockerHub-like (simplified)
+' Based on FAQ: Users (roles), Repositories, Tags, Stars, UserBadges
+' ============================
+
+hide circle
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+' ---------- Enums ----------
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+enum RepositoryVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum UserBadgeType {
+  NONE
+  VERIFIED_PUBLISHER
+  SPONSORED_OSS
+}
+
+' ---------- Classes ----------
+class User {
+  +id: UUID
+  +username: String
+  +email: String
+  +password_hash: String
+  +first_name: String
+  +last_name: String
+  +role: UserRole
+  +is_active: Boolean
+  +must_change_password: Boolean
+  +created_at: DateTime
+  +badge: UserBadgeType
+}
+
+class Repository {
+  +id: UUID
+  +name: String
+  +description: String
+  +visibility: RepositoryVisibility
+  +is_official: Boolean
+  +created_at: DateTime
+  +updated_at: DateTime
+  +deleted_at: DateTime
+}
+
+class Tag {
+  +id: UUID
+  +name: String
+  +digest: String
+  +size_bytes: Long
+  +pushed_at: DateTime
+  +created_at: DateTime
+}
+
+class Star {
+  +id: UUID
+  +created_at: DateTime
+}
+
+' ---------- Relationships ----------
+User "1" -- "0..*" Repository : owns >
+Repository "1" -- "0..*" Tag : has >
+
+User "1" -- "0..*" Star : creates >
+Repository "1" -- "0..*" Star : receives >
+' (Unique constraint in implementation: (user_id, repository_id))
+
+
+' ---------- Notes / Constraints ----------
+note left of User
+  - role is a single enum (no multi-role)
+  - SUPERADMIN created during Setup
+  - must_change_password=true blocks access
+    until password change on first login
+end note
+
+note left of Repository
+  - For user repositories, full name in UI:
+    owner.username + "/" + name
+  - For official repositories:
+    is_official=true and UI shows only name
+  - Explore badge filtering:
+    * Docker Official Image => is_official
+    * Verified Publisher / Sponsored OSS =>
+      derived from owner's UserBadge(s)
+end note
+
+note bottom of Star
+  Constraint (implementation):
+  unique(user_id, repository_id)
+end note
+
+@enduml
