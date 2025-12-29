@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>Profile</h1>
+
+    <p><b>Username:</b> {{ user_obj.username }}</p>
+    <p><b>Email:</b> {{ user_obj.email }}</p>
+    <p><b>Role:</b> {{ user_obj.role }}</p>
+    <p><b>Publisher status:</b> {{ user_obj.publisher_status }}</p>
+
+    <hr/>
+
+    <h2>My repositories</h2>
+    {% if owned_repos %}
+      <ul>
+        {% for repo in owned_repos %}
+          <li>
+            {% if repo.is_official %}
+              {{ repo.name }}
+            {% else %}
+              {{ repo.owner.username }}/{{ repo.name }}
+            {% endif %}
+            — Stars: {{ repo.star_count }}
+            — Visibility: {{ repo.visibility }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>You don’t own any repositories yet.</p>
+    {% endif %}
+
+    <hr/>
+
+    <h2>Starred repositories</h2>
+    {% if starred_repos %}
+      <ul>
+        {% for repo in starred_repos %}
+          <li>
+            {% if repo.is_official %}
+              {{ repo.name }}
+            {% else %}
+              {{ repo.owner.username }}/{{ repo.name }}
+            {% endif %}
+            — Stars: {{ repo.star_count }}
+            — Visibility: {{ repo.visibility }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No starred repositories yet.</p>
+    {% endif %}
+  </body>
+</html>
