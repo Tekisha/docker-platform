@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>Create admin account (SUPERADMIN only)</h1>
+
+    {% if messages %}
+      <ul>
+        {% for m in messages %}
+          <li>{{ m }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <p>
+        <label>Username</label><br/>
+        <input name="username" />
+      </p>
+
+      <p>
+        <label>Email (optional)</label><br/>
+        <input name="email" />
+      </p>
+
+      <p>
+        <label>Temporary password (optional)</label><br/>
+        <input name="temp_password" />
+        <br/>
+        <small>If empty, the system generates a strong password.</small>
+      </p>
+
+      <button type="submit">Create</button>
+    </form>
+
+    <p><a href="/accounts/admin/users/">Back to users</a></p>
+  </body>
+</html>

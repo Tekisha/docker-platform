@@ -9,3 +9,12 @@ def admin_required(view_func):
             raise PermissionDenied
         return view_func(request, *args, **kwargs)
     return _wrapped
+
+
+def superadmin_required(view_func):
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated or getattr(request.user, "role", None) != "SUPERADMIN":
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
