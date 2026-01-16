@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <body>
+    <h1>Users</h1>
+
+    <form method="get">
+      <input name="q" value="{{ q }}" placeholder="Search username/email/name"/>
+      <button type="submit">Search</button>
+    </form>
+
+    <hr/>
+
+    <table border="1" cellpadding="6">
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Publisher status</th>
+        <th>Action</th>
+      </tr>
+
+      {% for u in users %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.first_name }} {{ u.last_name }}</td>
+        <td>{{ u.publisher_status }}</td>
+        <td>
+          <form method="post" action="/accounts/admin/users/{{ u.id }}/publisher-status/">
+            {% csrf_token %}
+            <input type="hidden" name="q" value="{{ q }}"/>
+            <select name="publisher_status">
+              {% for value,label in u.PublisherStatus.choices %}
+                <option value="{{ value }}" {% if value == u.publisher_status %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+            <button type="submit">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No users found.</td></tr>
+      {% endfor %}
+    </table>
+  </body>
+</html>
