@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - DockerHub{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white rounded p-4 mb-4">
+            <div class="container-fluid py-3">
+                <h1 class="display-5 fw-bold">DockerHub</h1>
+                <p class="fs-4">Share and discover Docker images</p>
+                {% if not user.is_authenticated %}
+                    <div class="mt-3">
+                        <a href="{% url 'register' %}" class="btn btn-light btn-lg me-3">Get Started</a>
+                        <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg">Sign In</a>
+                    </div>
+                {% else %}
+                    <p class="fs-5 mt-3">Welcome back, {{ user.username }}!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-search fa-2x text-primary me-3"></i>
+                    <h5 class="card-title mb-0">Explore</h5>
+                </div>
+                <p class="card-text">Search and discover public Docker images</p>
+                <a href="{% url 'explore' %}" class="btn btn-outline-primary">Browse Repositories</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="fas fa-box fa-2x text-success me-3"></i>
+                    <h5 class="card-title mb-0">Repositories</h5>
+                </div>
+                <p class="card-text">Manage your Docker repositories and images</p>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'repositories' %}" class="btn btn-outline-success">My Repositories</a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-outline-success">Sign In to Access</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .jumbotron {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    }
+    .card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: transform 0.15s ease-in-out;
+    }
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+</style>
+
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% endblock %}
+{% endblock %}
