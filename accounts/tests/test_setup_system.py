@@ -40,9 +40,13 @@ class SetupSystemCommandTests(TestCase):
             pass_file = Path(tmp) / "superadmin_password.txt"
             os.environ["SUPERADMIN_PASS_FILE"] = str(pass_file)
 
+            # First run creates superadmin
             call_command("setup_system")
+            
+            # Second run should be idempotent (no flush in tests)
             call_command("setup_system")
 
+            # Should have exactly one superadmin
             self.assertEqual(User.objects.filter(role="SUPERADMIN").count(), 1)
 
     def test_fails_if_password_file_env_missing(self):

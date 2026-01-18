@@ -32,27 +32,34 @@ def write_secret_file(path: Path, content: str) -> None:
 
 
 class Command(BaseCommand):
-    help = "Initial system setup: creates a single SUPERADMIN and writes generated password to a file."
+    help = "Initial system setup: creates groups/permissions and SUPERADMIN. Optionally flushes database."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--force",
+            "--flush",
             action="store_true",
-            help="Force creation if no SUPERADMIN exists; still does not overwrite existing password file.",
+            help="Flush database before setup (default: False).",
         )
 
     @transaction.atomic
     def handle(self, *args, **options):
+        from django.core.management import call_command
         User = get_user_model()
+
+        # Optionally flush the database first
+        if options.get('flush'):
+            self.stdout.write("Flushing database...")
+            call_command('flush', '--noinput')
+            self.stdout.write(self.style.SUCCESS("Database flushed."))
 
         # Set up groups and permissions first
         self.stdout.write("Setting up groups and permissions...")
         setup_groups_and_permissions()
         self.stdout.write(self.style.SUCCESS("Groups and permissions configured."))
 
-        # If a superadmin exists, we do nothing (idempotent)
-        existing = User.objects.filter(role="SUPERADMIN").exists()
-        if existing and not options.get("--force", False):
+        # Check if superadmin already exists (if not flushing)
+        existing_superadmin = User.objects.filter(role="SUPERADMIN").first()
+        if existing_superadmin and not options.get('flush'):
             # Still need to assign existing users to groups
             self.stdout.write("Assigning existing users to groups...")
             for user in User.objects.all():
@@ -60,6 +67,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Setup already completed: SUPERADMIN exists. User groups updated."))
             return
 
+        # Create SUPERADMIN
         pass_file = os.getenv("SUPERADMIN_PASS_FILE")
         if not pass_file:
             raise SystemExit(
@@ -70,11 +78,10 @@ class Command(BaseCommand):
         username = os.getenv("SUPERADMIN_USERNAME", "superadmin")
         email = os.getenv("SUPERADMIN_EMAIL", "superadmin@example.com")
 
-        # If somehow exists but filter differs, guard against duplicates by username too
+        # Check for username conflicts
         if User.objects.filter(username=username).exists():
-            # If username taken but no superadmin role exists, we still shouldn't create duplicate blindly.
-            # Better to fail loudly.
-            raise SystemExit(f"Cannot create superadmin: username '{username}' is already taken.")
+            if not options.get('flush'):
+                raise SystemExit(f"Cannot create superadmin: username '{username}' is already taken.")
 
         password = generate_password()
 
