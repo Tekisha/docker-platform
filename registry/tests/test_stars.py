@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from registry.models import Repository, Star
+from accounts.permissions import setup_groups_and_permissions, assign_user_to_group
 
 
 User = get_user_model()
@@ -10,9 +11,17 @@ User = get_user_model()
 
 class StarRulesTests(TestCase):
     def setUp(self):
+        # Set up groups and permissions first
+        setup_groups_and_permissions()
+        
         self.owner = User.objects.create_user(username="owner", password="pass", role="USER")
+        assign_user_to_group(self.owner)
+        
         self.other = User.objects.create_user(username="other", password="pass", role="USER")
+        assign_user_to_group(self.other)
+        
         self.admin = User.objects.create_user(username="admin", password="pass", role="ADMIN")
+        assign_user_to_group(self.admin)
 
         self.public_repo = Repository.objects.create(
             owner=self.owner, name="pub", description="", visibility=Repository.Visibility.PUBLIC, is_official=False
