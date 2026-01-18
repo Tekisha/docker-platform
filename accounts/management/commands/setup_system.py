@@ -7,6 +7,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.contrib.auth import get_user_model
+from accounts.permissions import setup_groups_and_permissions, assign_user_to_group
 
 
 def generate_password(length: int = 24) -> str:
@@ -20,13 +21,8 @@ def generate_password(length: int = 24) -> str:
 def write_secret_file(path: Path, content: str) -> None:
     """
     Writes secret to file with best-effort safe permissions.
-    If the file already exists, do not overwrite (prevents accidental rotation without intent).
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Don't overwrite if already exists
-    if path.exists():
-        return
 
     # Create file atomically
     tmp_path = path.with_suffix(path.suffix + ".tmp")
@@ -49,10 +45,19 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
 
+        # Set up groups and permissions first
+        self.stdout.write("Setting up groups and permissions...")
+        setup_groups_and_permissions()
+        self.stdout.write(self.style.SUCCESS("Groups and permissions configured."))
+
         # If a superadmin exists, we do nothing (idempotent)
         existing = User.objects.filter(role="SUPERADMIN").exists()
         if existing and not options.get("--force", False):
-            self.stdout.write(self.style.SUCCESS("Setup already completed: SUPERADMIN exists. Nothing to do."))
+            # Still need to assign existing users to groups
+            self.stdout.write("Assigning existing users to groups...")
+            for user in User.objects.all():
+                assign_user_to_group(user)
+            self.stdout.write(self.style.SUCCESS("Setup already completed: SUPERADMIN exists. User groups updated."))
             return
 
         pass_file = os.getenv("SUPERADMIN_PASS_FILE")
@@ -84,6 +89,9 @@ class Command(BaseCommand):
         user.is_staff = True
         user.is_superuser = True
         user.save()
+
+        # Assign user to appropriate group
+        assign_user_to_group(user)
 
         # Write password to file (do not overwrite if file already exists)
         write_secret_file(Path(pass_file), password)
