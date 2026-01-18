@@ -48,12 +48,6 @@ python manage.py migrate
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Setup system if SETUP_SYSTEM is true
-if [ "$SETUP_SYSTEM" = "true" ]; then
-    echo "Setting up system (groups, permissions, superadmin)..."
-    python manage.py setup_system --flush
-fi
-
 echo "Django application is ready!"
 
 # Execute the main command
