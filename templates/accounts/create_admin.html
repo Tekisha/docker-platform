@@ -1,39 +1,76 @@
-<!doctype html>
-<html>
-  <body>
-    <h1>Create admin account (SUPERADMIN only)</h1>
+{% extends 'base.html' %}
 
-    {% if messages %}
-      <ul>
-        {% for m in messages %}
-          <li>{{ m }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
+{% block title %}Create Administrator - DockerHub{% endblock %}
 
-    <form method="post">
-      {% csrf_token %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0"><i class="fas fa-user-plus"></i> Create Administrator Account</h3>
+                <small class="text-muted">Super Administrator Only</small>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="username" id="username" required placeholder="Enter username">
+                    </div>
 
-      <p>
-        <label>Username</label><br/>
-        <input name="username" />
-      </p>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" id="email" placeholder="Enter email address (optional)">
+                        <div class="form-text">Email is optional but recommended for account recovery.</div>
+                    </div>
 
-      <p>
-        <label>Email (optional)</label><br/>
-        <input name="email" />
-      </p>
+                    <div class="mb-3">
+                        <label for="temp_password" class="form-label">Temporary Password</label>
+                        <input type="password" class="form-control" name="temp_password" id="temp_password" placeholder="Leave empty for auto-generated password">
+                        <div class="form-text">
+                            If left empty, the system will generate a strong password. The new administrator must change it on first login.
+                        </div>
+                    </div>
 
-      <p>
-        <label>Temporary password (optional)</label><br/>
-        <input name="temp_password" />
-        <br/>
-        <small>If empty, the system generates a strong password.</small>
-      </p>
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> The new administrator will be required to change their password on first login.
+                    </div>
 
-      <button type="submit">Create</button>
-    </form>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Administrator
+                        </button>
+                        <a href="{% url 'admin_user_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Users
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <p><a href="/accounts/admin/users/">Back to users</a></p>
-  </body>
-</html>
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .form-text {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    .alert {
+        border: none;
+        border-radius: 0.375rem;
+    }
+</style>
+{% endblock %}
+{% endblock %}

@@ -40,3 +40,30 @@ class User(AbstractUser):
 
     def is_superadmin(self) -> bool:
         return self.role == self.UserRole.SUPERADMIN
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_role = None
+        
+        if not is_new:
+            try:
+                old_instance = User.objects.get(pk=self.pk)
+                old_role = old_instance.role
+            except User.DoesNotExist:
+                # Handle edge case where pk exists but object doesn't
+                is_new = True
+        
+        super().save(*args, **kwargs)
+        
+        # Assign to groups if role changed or new user
+        if is_new or old_role != self.role:
+            self._assign_to_group()
+    
+    def _assign_to_group(self):
+        """Assign user to appropriate group based on role"""
+        try:
+            from accounts.permissions import assign_user_to_group
+            assign_user_to_group(self)
+        except Exception:
+            # Groups might not be set up yet, ignore silently
+            pass

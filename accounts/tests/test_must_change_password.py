@@ -3,11 +3,15 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from accounts.permissions import setup_groups_and_permissions, assign_user_to_group
 
 User = get_user_model()
 
 class MustChangePasswordMiddlewareTests(TestCase):
     def setUp(self):
+        # Set up groups and permissions first
+        setup_groups_and_permissions()
+        
         User = get_user_model()
         self.user = User.objects.create_user(
             username="superadmin",
@@ -17,6 +21,7 @@ class MustChangePasswordMiddlewareTests(TestCase):
             is_staff=True,
             is_superuser=True,
         )
+        assign_user_to_group(self.user)
 
     def test_redirects_any_page_to_password_change(self):
         self.client.login(username="superadmin", password="TempPass123!")

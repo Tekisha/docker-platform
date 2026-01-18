@@ -1,12 +1,16 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from accounts.permissions import setup_groups_and_permissions, assign_user_to_group
 
 User = get_user_model()
 
 
 class SuperadminCreateAdminTests(TestCase):
     def setUp(self):
+        # Set up groups and permissions first
+        setup_groups_and_permissions()
+        
         self.superadmin = User.objects.create_user(
             username="superadmin",
             password="pass12345!",
@@ -16,6 +20,7 @@ class SuperadminCreateAdminTests(TestCase):
         self.superadmin.is_staff = True
         self.superadmin.is_superuser = True
         self.superadmin.save(update_fields=["is_staff", "is_superuser"])
+        assign_user_to_group(self.superadmin)
 
         self.admin = User.objects.create_user(
             username="admin1",
@@ -23,11 +28,14 @@ class SuperadminCreateAdminTests(TestCase):
             role="ADMIN",
             must_change_password=False,
         )
+        assign_user_to_group(self.admin)
+        
         self.user = User.objects.create_user(
             username="alice",
             password="pass12345!",
             role="USER",
         )
+        assign_user_to_group(self.user)
 
     def test_only_superadmin_can_access_page(self):
         url = reverse("create_admin")
