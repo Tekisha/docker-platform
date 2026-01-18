@@ -39,6 +39,9 @@
                                 <tr>
                                     <td>
                                         <strong>{{ u.username }}</strong>
+                                        {% if u.role != 'USER' %}
+                                            <i class="fas fa-shield-alt text-primary ms-1" title="Administrator"></i>
+                                        {% endif %}
                                     </td>
                                     <td>{{ u.email }}</td>
                                     <td>{{ u.first_name }} {{ u.last_name }}</td>
@@ -79,7 +82,13 @@
                                                 </div>
                                             </form>
                                         {% else %}
-                                            <small class="text-muted">Admin user</small>
+                                            <small class="text-muted">
+                                                {% if u.role == 'SUPERADMIN' %}
+                                                    <i class="fas fa-crown"></i> System Administrator
+                                                {% else %}
+                                                    <i class="fas fa-user-shield"></i> Administrator
+                                                {% endif %}
+                                            </small>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -97,6 +106,14 @@
                         {% else %}
                             <p>No users in the system.</p>
                         {% endif %}
+                        
+                        <div class="mt-3">
+                            <p class="text-info">
+                                <i class="fas fa-info-circle"></i> 
+                                <strong>Note:</strong> Only regular users can have their publisher status modified. 
+                                Administrator accounts are shown for reference only.
+                            </p>
+                        </div>
                     </div>
                 {% endif %}
             </div>

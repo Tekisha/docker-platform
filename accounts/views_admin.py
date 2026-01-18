@@ -15,7 +15,7 @@ def admin_user_list(request):
     """
     q = (request.GET.get('q') or '').strip()
 
-    users = User.objects.filter(role='USER').order_by('username')
+    users = User.objects.all().order_by('role', 'username')
 
     if q:
         users = users.filter(
@@ -33,8 +33,15 @@ def admin_user_list(request):
 def set_publisher_status(request, user_id):
     """
     Admin assigns publisher_status to a USER account.
+    Only regular users can have their publisher status modified.
     """
-    target = get_object_or_404(User, id=user_id, role='USER')
+    target = get_object_or_404(User, id=user_id)
+    
+    # Only allow publisher status changes for regular users
+    if target.role != 'USER':
+        # Silently ignore attempts to modify admin users
+        q = (request.POST.get('q') or '').strip()
+        return redirect(f'/accounts/admin/users/?q={q}')
 
     status = request.POST.get('publisher_status', 'NONE')
 
