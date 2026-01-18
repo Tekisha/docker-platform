@@ -7,7 +7,7 @@ from django.core.validators import validate_email
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
-from .permissions import superadmin_required
+from .permissions import superadmin_required, assign_user_to_group
 
 User = get_user_model()
 
@@ -60,6 +60,9 @@ def create_admin(request):
     admin_user.is_superuser = False
 
     admin_user.save(update_fields=["role", "must_change_password", "is_staff", "is_superuser"])
+
+    # Assign user to appropriate group
+    assign_user_to_group(admin_user)
 
     messages.success(request, f"Admin '{username}' created. Temporary password: {temp_password}")
     return redirect("admin_user_list")  # reuse your existing admin users page

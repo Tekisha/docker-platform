@@ -3,19 +3,19 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .permissions import admin_required
+from .permissions import user_management_permission_required
 
 User = get_user_model()
 
 
-@admin_required
+@user_management_permission_required
 def admin_user_list(request):
     """
     Admins can search ordinary users and assign publisher_status.
     """
-    q = (request.GET.get("q") or "").strip()
+    q = (request.GET.get('q') or '').strip()
 
-    users = User.objects.filter(role="USER").order_by("username")
+    users = User.objects.filter(role='USER').order_by('username')
 
     if q:
         users = users.filter(
@@ -25,26 +25,26 @@ def admin_user_list(request):
             | Q(last_name__icontains=q)
         )
 
-    return render(request, "accounts/admin_user_list.html", {"users": users, "q": q})
+    return render(request, 'accounts/admin_user_list.html', {'users': users, 'q': q})
 
 
-@admin_required
+@user_management_permission_required
 @require_POST
 def set_publisher_status(request, user_id):
     """
     Admin assigns publisher_status to a USER account.
     """
-    target = get_object_or_404(User, id=user_id, role="USER")
+    target = get_object_or_404(User, id=user_id, role='USER')
 
-    status = request.POST.get("publisher_status", "NONE")
+    status = request.POST.get('publisher_status', 'NONE')
 
     allowed = {choice[0] for choice in User.PublisherStatus.choices}
     if status not in allowed:
-        status = "NONE"
+        status = 'NONE'
 
     target.publisher_status = status
-    target.save(update_fields=["publisher_status"])
+    target.save(update_fields=['publisher_status'])
 
     # keep search query in redirect
-    q = (request.POST.get("q") or "").strip()
-    return redirect(f"/accounts/admin/users/?q={q}")
+    q = (request.POST.get('q') or '').strip()
+    return redirect(f'/accounts/admin/users/?q={q}')
