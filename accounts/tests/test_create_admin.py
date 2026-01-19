@@ -1,53 +1,24 @@
-from django.test import TestCase
-from django.urls import reverse
+import pytest
 from django.contrib.auth import get_user_model
-from accounts.permissions import setup_groups_and_permissions, assign_user_to_group
+from django.urls import reverse
 
 User = get_user_model()
 
+@pytest.mark.django_db
+def test_only_superadmin_can_access_page(client, superadmin_user, admin_user, regular_user):
+    url = reverse("create_admin")
 
-class SuperadminCreateAdminTests(TestCase):
-    def setUp(self):
-        # Set up groups and permissions first
-        setup_groups_and_permissions()
-        
-        self.superadmin = User.objects.create_user(
-            username="superadmin",
-            password="pass12345!",
-            role="SUPERADMIN",
-            must_change_password=False,
-        )
-        self.superadmin.is_staff = True
-        self.superadmin.is_superuser = True
-        self.superadmin.save(update_fields=["is_staff", "is_superuser"])
-        assign_user_to_group(self.superadmin)
+    # Regular user should not have access
+    client.login(username="alice", password="pass12345")
+    assert client.get(url).status_code == 403
 
-        self.admin = User.objects.create_user(
-            username="admin1",
-            password="pass12345!",
-            role="ADMIN",
-            must_change_password=False,
-        )
-        assign_user_to_group(self.admin)
-        
-        self.user = User.objects.create_user(
-            username="alice",
-            password="pass12345!",
-            role="USER",
-        )
-        assign_user_to_group(self.user)
+    # Admin should not have access
+    client.login(username="admin1", password="pass12345")
+    assert client.get(url).status_code == 403
 
-    def test_only_superadmin_can_access_page(self):
-        url = reverse("create_admin")
-
-        self.client.login(username="alice", password="pass12345!")
-        self.assertEqual(self.client.get(url).status_code, 403)
-
-        self.client.login(username="admin1", password="pass12345!")
-        self.assertEqual(self.client.get(url).status_code, 403)
-
-        self.client.login(username="superadmin", password="pass12345!")
-        self.assertEqual(self.client.get(url).status_code, 200)
+    # Superadmin should have access
+    client.login(username="superadmin", password="pass12345!")
+    assert client.get(url).status_code == 200
 
     def test_superadmin_can_create_admin(self):
         self.client.login(username="superadmin", password="pass12345!")
