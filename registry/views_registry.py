@@ -36,6 +36,7 @@ def get_x5c_chain():
         return []
 
 
+@csrf_exempt
 def docker_auth(request):
     user = None
     if 'HTTP_AUTHORIZATION' in request.META:
@@ -56,76 +57,80 @@ def docker_auth(request):
     service = request.GET.get(
         'service', getattr(settings, 'REGISTRY_SERVICE', 'my-docker-registry')
     )
-    scope_param = request.GET.get('scope', '')
+    scope_params = request.GET.getlist('scope')
 
     access_list = []
 
-    if scope_param:
-        try:
-            # Format: "repository:name:actions"
-            # (User): "repository:mika/web-app:pull,push"
-            # (Official): "repository:ubuntu:pull,push"
-            scope_param = unquote(scope_param)
-            typ, name, actions = scope_param.split(':')
-            requested_actions = actions.split(',')
+    for scope_param in scope_params:
+        if scope_param:
+            try:
+                # Format: "repository:name:actions"
+                # (User): "repository:mika/web-app:pull,push"
+                # (Official): "repository:ubuntu:pull,push"
+                scope_param = unquote(scope_param)
+                typ, name, actions = scope_param.split(':')
+                requested_actions = actions.split(',')
 
-            repo = None
+                repo = None
 
-            parts = name.split('/')
+                parts = name.split('/')
 
-            if len(parts) == 2:
-                repo_owner_username = parts[0]
-                repo_name = parts[1]
+                if len(parts) == 2:
+                    repo_owner_username = parts[0]
+                    repo_name = parts[1]
 
-                try:
-                    repo = Repository.objects.get(
-                        owner__username=repo_owner_username,
-                        name=repo_name,
-                        is_official=False,  # only user repos here
+                    try:
+                        repo = Repository.objects.get(
+                            owner__username=repo_owner_username,
+                            name=repo_name,
+                            is_official=False,  # only user repos here
+                        )
+                    except Repository.DoesNotExist:
+                        repo = None
+
+                elif len(parts) == 1:
+                    repo_name = parts[0]
+                    try:
+                        repo = Repository.objects.get(name=repo_name, is_official=True)
+                    except Repository.DoesNotExist:
+                        repo = None
+
+                allowed_actions = []
+
+                is_public = False
+                if repo:
+                    if repo.visibility == Repository.Visibility.PUBLIC:
+                        is_public = True
+
+                if 'pull' in requested_actions:
+                    if is_public:
+                        allowed_actions.append('pull')
+                    elif repo and user and repo.owner == user:
+                        allowed_actions.append('pull')
+                    elif repo and not is_public and not user:
+                        # Private repo access requires authentication
+                        return JsonResponse({'error': 'Authentication required'}, status=401)
+                    elif not repo and user:
+                        # Allow pull for non-existent repos if user is authenticated
+                        # (needed for some base images)
+                        allowed_actions.append('pull')
+
+                if 'push' in requested_actions:
+                    if user and repo:
+                        if repo.owner == user:
+                            allowed_actions.append('push')
+                    elif repo and not user:
+                        # Push operations always require authentication
+                        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+                if allowed_actions:
+                    access_list.append(
+                        {'type': typ, 'name': name, 'actions': allowed_actions}
                     )
-                except Repository.DoesNotExist:
-                    repo = None
 
-            elif len(parts) == 1:
-                repo_name = parts[0]
-                try:
-                    repo = Repository.objects.get(name=repo_name, is_official=True)
-                except Repository.DoesNotExist:
-                    repo = None
-
-            allowed_actions = []
-
-            is_public = False
-            if repo:
-                if repo.visibility == Repository.Visibility.PUBLIC:
-                    is_public = True
-
-            if 'pull' in requested_actions:
-                if is_public:
-                    allowed_actions.append('pull')
-                elif repo and user and repo.owner == user:
-                    allowed_actions.append('pull')
-                elif repo and not is_public and not user:
-                    # Private repo access requires authentication
-                    return JsonResponse({'error': 'Authentication required'}, status=401)
-                elif not repo and user:
-                    pass
-
-            if 'push' in requested_actions:
-                if user and repo:
-                    if repo.owner == user:
-                        allowed_actions.append('push')
-                elif repo and not user:
-                    # Push operations always require authentication
-                    return JsonResponse({'error': 'Authentication required'}, status=401)
-
-            if allowed_actions:
-                access_list.append(
-                    {'type': typ, 'name': name, 'actions': allowed_actions}
-                )
-
-        except ValueError:
-            pass
+            except ValueError:
+                # Invalid scope format, skip
+                pass
 
     now = int(time.time())
     payload = {
