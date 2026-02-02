@@ -1,0 +1,192 @@
+import base64
+import json
+import os
+import time
+
+from django.conf import settings
+from django.contrib.auth import authenticate
+from django.db.models import Q
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from jose import jwt
+
+from .models import Repository, Tag
+
+
+def get_x5c_chain():
+    """
+    Loads the public certificate from auth.crt file and formats it for x5c jwT header
+    """
+    try:
+        certificate = getattr(settings, 'REGISTRY_PUBLIC_CERTIFICATE', '')
+        lines = certificate.splitlines()
+        clean_lines = [
+            line.strip() for line in lines if '-----' not in line and line.strip()
+        ]
+
+        cert_content = ''.join(clean_lines)
+
+        return [cert_content]
+    except FileNotFoundError:
+        print('ERROR: auth.crt not found for x5c header!')
+        return []
+
+
+def docker_auth(request):
+    user = None
+    if 'HTTP_AUTHORIZATION' in request.META:
+        auth = request.META['HTTP_AUTHORIZATION'].split()
+        if len(auth) == 2 and auth[0].lower() == 'basic':
+            try:
+                username, password = (
+                    base64.b64decode(auth[1]).decode('utf-8').split(':')
+                )
+                user = authenticate(username=username, password=password)
+                if user is None:
+                    return JsonResponse({'error': 'Invalid credentials'}, status=401)
+            except:
+                return JsonResponse({'error': 'Invalid authorization header'}, status=401)
+        else:
+            return JsonResponse({'error': 'Invalid authorization format'}, status=401)
+
+    service = request.GET.get(
+        'service', getattr(settings, 'REGISTRY_SERVICE', 'my-docker-registry')
+    )
+    scope_param = request.GET.get('scope', '')
+
+    access_list = []
+
+    if scope_param:
+        try:
+            # Format: "repository:name:actions"
+            # (User): "repository:mika/web-app:pull,push"
+            # (Official): "repository:ubuntu:pull,push"
+            typ, name, actions = scope_param.split(':')
+            requested_actions = actions.split(',')
+
+            repo = None
+            is_official_request = False
+
+            parts = name.split('/')
+
+            if len(parts) == 2:
+                repo_owner_username = parts[0]
+                repo_name = parts[1]
+
+                try:
+                    repo = Repository.objects.get(
+                        owner__username=repo_owner_username,
+                        name=repo_name,
+                        is_official=False,  # only user repos here
+                    )
+                except Repository.DoesNotExist:
+                    repo = None
+
+            elif len(parts) == 1:
+                repo_name = parts[0]
+                is_official_request = True  # only official repos have single-part names
+
+                try:
+                    repo = Repository.objects.get(name=repo_name, is_official=True)
+                except Repository.DoesNotExist:
+                    repo = None
+
+            allowed_actions = []
+
+            is_public = False
+            if repo:
+                if repo.visibility == Repository.Visibility.PUBLIC:
+                    is_public = True
+
+            if 'pull' in requested_actions:
+                if is_public:
+                    allowed_actions.append('pull')
+                elif repo and user and repo.owner == user:
+                    allowed_actions.append('pull')
+                elif repo and not is_public and not user:
+                    # Private repo access requires authentication
+                    return JsonResponse({'error': 'Authentication required'}, status=401)
+                elif not repo and user:
+                    pass
+
+            if 'push' in requested_actions:
+                if user and repo:
+                    if repo.owner == user:
+                        allowed_actions.append('push')
+                elif repo and not user:
+                    # Push operations always require authentication
+                    return JsonResponse({'error': 'Authentication required'}, status=401)
+
+            if allowed_actions:
+                access_list.append(
+                    {'type': typ, 'name': name, 'actions': allowed_actions}
+                )
+
+        except ValueError:
+            pass
+
+    now = int(time.time())
+    payload = {
+        'iss': getattr(settings, 'REGISTRY_ISSUER', 'docker-platform'),
+        'sub': user.username if user else 'anonymous',
+        'aud': service,
+        'exp': now + 300,
+        'nbf': now,
+        'iat': now,
+        'access': access_list,
+        'jti': base64.urlsafe_b64encode(os.urandom(16)).decode('utf-8'),
+    }
+    custom_headers = {'type': 'JWT', 'x5c': get_x5c_chain(), 'alg': 'RS256'}
+
+    private_key = getattr(settings, 'REGISTRY_PRIVATE_KEY', '')
+    token = jwt.encode(payload, private_key, algorithm='RS256', headers=custom_headers)
+
+    return JsonResponse({'token': token})
+
+
+@csrf_exempt
+def registry_webhook(request):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+        events = data.get('events', [])
+
+        for event in events:
+            if event['action'] == 'push':
+                target = event['target']
+                full_name = target['repository']  # moze biti "mika/app" ili "ubuntu"
+                tag_name = target.get('tag')
+                digest = target['digest']
+                size = target['size']
+
+                if not tag_name:
+                    continue
+
+                parts = full_name.split('/')
+                repo = None
+
+                try:
+                    if len(parts) == 2:
+                        repo = Repository.objects.get(
+                            owner__username=parts[0], name=parts[1], is_official=False
+                        )
+                    elif len(parts) == 1:
+                        repo = Repository.objects.get(name=parts[0], is_official=True)
+                except Repository.DoesNotExist:
+                    print(f'Warning: Push received for unknown repo {full_name}')
+                    continue
+
+                if repo:
+                    Tag.objects.update_or_create(
+                        repository=repo,
+                        name=tag_name,
+                        defaults={'digest': digest, 'size': size},
+                    )
+                    print(f'Updated tag: {repo} : {tag_name}')
+
+    except Exception as e:
+        print(f'Webhook error: {e}')
+
+    return HttpResponse('OK')
