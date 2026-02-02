@@ -1,29 +1,70 @@
 services:
-  db:
-    image: postgres:16
-    container_name: scm_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: scm_db
-      POSTGRES_USER: scm_user
-      POSTGRES_PASSWORD: scm_pass
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    db:
+        image: postgres:16
+        container_name: scm_postgres
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: scm_db
+            POSTGRES_USER: scm_user
+            POSTGRES_PASSWORD: scm_pass
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        networks:
+            - app_network
 
-  web:
-    build: .
-    container_name: scm_django_web
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./secrets:/app/secrets
-    depends_on:
-      - db
+    web:
+        build: .
+        container_name: scm_django_web
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - "8000:8000"
+        volumes:
+            - ./secrets:/app/secrets
+            - ./certs:/app/certs
+        depends_on:
+            - db
+        networks:
+            - app_network
+
+    registry:
+        image: registry:2
+        environment:
+            REGISTRY_AUTH: token
+            REGISTRY_AUTH_TOKEN_REALM: http://localhost/api/auth/token/
+            REGISTRY_AUTH_TOKEN_SERVICE: docker-platform-registry
+            REGISTRY_AUTH_TOKEN_ISSUER: docker-platform
+            REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE: /certs/jwt.crt
+
+            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_NAME: django-listener
+            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_URL: http://web:8000/api/webhooks/registry/
+            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_HEADERS_Authorization: Basic whatever
+
+            REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+        volumes:
+            - registry-data:/var/lib/registry
+            - ./certs:/certs
+        networks:
+            - app_network
+
+    nginx:
+        image: nginx:latest
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+        depends_on:
+            - web
+            - registry
+        networks:
+            - app_network
+
+networks:
+    app_network:
 
 volumes:
-  postgres_data:
+    postgres_data:
+    registry-data:

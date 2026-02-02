@@ -1,6 +1,6 @@
 # Docker Registry Platform
 
-A Django-based Docker registry management platform with user authentication, repository management, and administrative features.
+A Django-based Docker registry management platform with user authentication, repository management, and administrative features. Uses nginx as a reverse proxy to route traffic between the Django web application and Docker Registry.
 
 ## Quick Start with Docker
 
@@ -47,7 +47,11 @@ docker-compose run --rm web python manage.py setup_system --flush
 docker-compose up -d
 ```
 
-The application will be available at: **http://localhost:8000**
+The application will be available at: **http://localhost** (nginx serves on port 80)
+
+- **Web Interface**: http://localhost (Django app)
+- **Docker Registry**: http://localhost/v2/ (Docker Registry API)
+- **Direct Django**: http://localhost:8000 (bypasses nginx)
 
 ### 4. Get Admin Credentials
 
@@ -98,9 +102,23 @@ docker-compose run --rm web python manage.py setup_system --flush
 # Setup without data loss (idempotent)
 docker-compose run --rm web python manage.py setup_system
 
+# Create new migrations after model changes
+docker-compose run --rm web python manage.py makemigrations
+
+# Apply migrations
+docker-compose run --rm web python manage.py migrate
+
 # Database shell
 docker-compose exec db psql -U scm_user -d scm_db
 ```
+
+## Architecture
+
+The platform uses nginx as a reverse proxy:
+- **nginx** (port 80) - Routes traffic between Django and Docker Registry
+- **Django** (port 8000) - Web application and API
+- **Docker Registry** (port 5000) - Docker image storage
+- **PostgreSQL** (port 5432) - Database
 
 ## Manual Setup (Without Docker)
 
@@ -115,19 +133,74 @@ If you prefer to run without Docker:
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
+# Configure environment (change POSTGRES_HOST=db to POSTGRES_HOST=localhost in .env)
 export SUPERADMIN_PASS_FILE=./secrets/superadmin_password.txt
 
 # Database setup
+python manage.py makemigrations
 python manage.py migrate
 python manage.py setup_system --flush
 
-# Run server
-python manage.py runserver
+# Run server (use port 8001 to avoid conflicts with Docker setup)
+python manage.py runserver 8001
 ```
 
-### Creating Migrations
+**Note**: When running locally, the app will be available at **http://localhost:8001**
+
+## Development Workflow
+
+### Working with Database Migrations
+
+**With Docker:**
 ```bash
+# Create new migrations after model changes
 docker-compose run --rm web python manage.py makemigrations
+
+# Apply migrations
 docker-compose run --rm web python manage.py migrate
 ```
+
+**Locally:**
+```bash
+# Activate virtual environment (if using one)
+source venv/bin/activate
+
+# Create new migrations
+python manage.py makemigrations
+
+# Apply migrations
+python manage.py migrate
+```
+
+### Running Tests
+
+**With Docker:**
+```bash
+# Run all tests
+docker-compose run --rm web python manage.py test
+
+# Run specific test file
+docker-compose run --rm web python manage.py test registry.tests.test_repositories
+
+# Run with pytest
+docker-compose run --rm web python -m pytest
+```
+
+**Locally:**
+```bash
+# Ensure database is set up for tests
+python manage.py migrate
+
+# Run all tests
+python manage.py test
+
+# Run with pytest
+python -m pytest
+```
+
+### Port Configuration Summary
+
+- **Docker (with nginx)**: http://localhost (port 80)
+- **Docker (direct Django)**: http://localhost:8000
+- **Local development**: http://localhost:8001 (recommended to avoid conflicts)
+- **PostgreSQL**: localhost:5432
