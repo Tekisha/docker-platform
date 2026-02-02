@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit {{ repository.name }} - DockerHub{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'repository_list' %}">My Repositories</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'repository_detail' repository.id %}">{{ repository.name }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Edit</li>
+            </ol>
+        </nav>
+
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>Edit Repository Settings
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Repository info -->
+                <div class="alert alert-info" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Repository:</strong>
+                            {% if repository.is_official %}
+                                <span class="badge bg-warning text-dark ms-1">
+                                    <i class="fas fa-star me-1"></i>{{ repository.name }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-primary ms-1">{{ repository.owner.username }}/{{ repository.name }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <small class="text-muted mt-1 d-block">
+                        Note: Repository name cannot be changed after creation. Only description and visibility can be modified.
+                    </small>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                        {{ form.description }}
+                        {% if form.description.help_text %}
+                            <div class="form-text">{{ form.description.help_text }}</div>
+                        {% endif %}
+                        {% if form.description.errors %}
+                            {% for error in form.description.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <!-- Visibility -->
+                    <div class="mb-4">
+                        <label for="{{ form.visibility.id_for_label }}" class="form-label">
+                            Visibility <span class="text-danger">*</span>
+                        </label>
+                        {{ form.visibility }}
+                        {% if form.visibility.help_text %}
+                            <div class="form-text">{{ form.visibility.help_text }}</div>
+                        {% endif %}
+                        {% if form.visibility.errors %}
+                            {% for error in form.visibility.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <!-- Visibility explanation -->
+                        <div class="mt-2">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100 visibility-option" data-value="PUBLIC">
+                                        <h6><i class="fas fa-globe text-success me-1"></i> Public</h6>
+                                        <small class="text-muted">
+                                            Anyone can discover and view this repository. You choose who can commit.
+                                        </small>
+                                    </div>
+                                </div></h6>
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100 visibility-option" data-value="PRIVATE">
+                                        <h6><i class="fas fa-lock text-secondary me-1"></i> Private</h6>
+                                        <small class="text-muted">
+                                            Only you can view and access this repository.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current Tags Info -->
+                    <div class="alert alert-light border mb-4" role="alert">
+                        <h6 class="alert-heading"><i class="fas fa-tags me-2"></i>Current Tags</h6>
+                        <p class="mb-2">This repository currently has <strong>{{ repository.tags.count }}</strong> tag{{ repository.tags.count|pluralize }}.</p>
+                        {% if repository.tags.exists %}
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for tag in repository.tags.all|slice:":10" %}
+                                    <span class="badge bg-secondary">{{ tag.name }}</span>
+                                {% endfor %}
+                                {% if repository.tags.count > 10 %}
+                                    <span class="text-muted">... and {{ repository.tags.count|add:"-10" }} more</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        <hr class="my-2">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Changing visibility will affect all tags in this repository.
+                        </small>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Save Changes
+                        </button>
+                        <a href="{% url 'repository_detail' repository.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+
+                <!-- Additional Actions -->
+                <div class="mt-4 pt-4 border-top">
+                    <h6 class="text-muted mb-3">Additional Actions</h6>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'repository_detail' repository.id %}" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-eye me-1"></i>View Repository
+                        </a>
+                        <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="fas fa-trash me-1"></i>Delete Repository
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Repository Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Delete Repository</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the repository <strong>{{ repository.name }}</strong>?</p>
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. All {{ repository.tags.count }} tag{{ repository.tags.count|pluralize }} and data associated with this repository will be permanently deleted.
+                </div>
+                {% if repository.tags.exists %}
+                    <div class="mb-3">
+                        <strong>Tags that will be deleted:</strong>
+                        <div class="mt-2 d-flex flex-wrap gap-1">
+                            {% for tag in repository.tags.all %}
+                                <span class="badge bg-danger">{{ tag.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'repository_delete' repository.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>Delete Repository
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Highlight selected visibility option
+    const visibilitySelect = document.getElementById('{{ form.visibility.id_for_label }}');
+    const visibilityOptions = document.querySelectorAll('.visibility-option');
+
+    function updateVisibilityHighlight() {
+        const selectedValue = visibilitySelect.value;
+        visibilityOptions.forEach(option => {
+            if (option.dataset.value === selectedValue) {
+                option.classList.add('border-primary', 'bg-light');
+                option.classList.remove('border-secondary');
+            } else {
+                option.classList.add('border-secondary');
+                option.classList.remove('border-primary', 'bg-light');
+            }
+        });
+    }
+
+    // Initial highlight
+    updateVisibilityHighlight();
+
+    // Update on change
+    visibilitySelect.addEventListener('change', updateVisibilityHighlight);
+
+    // Click on visibility option to select
+    visibilityOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            visibilitySelect.value = this.dataset.value;
+            updateVisibilityHighlight();
+        });
+
+        // Add hover effect
+        option.addEventListener('mouseenter', function() {
+            if (!this.classList.contains('border-primary')) {
+                this.style.cursor = 'pointer';
+                this.classList.add('border-secondary');
+            }
+        });
+    });
+
+    // Form validation
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const visibilitySelect = document.getElementById('{{ form.visibility.id_for_label }}');
+            if (!visibilitySelect.value) {
+                e.preventDefault();
+                visibilitySelect.focus();
+                visibilitySelect.classList.add('is-invalid');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .visibility-option {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .visibility-option:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .visibility-option.border-primary {
+        border-color: #0d6efd !important;
+        background-color: #f8f9fa;
+    }
+
+    .alert {
+        border-left: 4px solid #0d6efd;
+    }
+
+    .alert-danger {
+        border-left-color: #dc3545;
+    }
+
+    .alert-light {
+        border-left-color: #6c757d;
+    }
+
+    .badge {
+        font-size: 0.8em;
+    }
+
+    .breadcrumb {
+        background: none;
+        padding: 0;
+    }
+</style>
+{% endblock %}

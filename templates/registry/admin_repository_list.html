@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin - Official Repositories - DockerHub{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-boxes me-2"></i>Official Repositories</h2>
+    <div>
+        <a href="{% url 'repository_create' %}?official=true" class="btn btn-success ms-2">
+            <i class="fas fa-star me-1"></i>Create Official Repository
+        </a>
+    </div>
+</div>
+
+<!-- Simple Search Form -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-10">
+                {{ form.search.label_tag }}
+                {{ form.search }}
+                <div class="form-text">Search by name</div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <a href="{% url 'admin_repository_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Repositories Table -->
+{% if repositories %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Repository</th>
+                            <th>Owner</th>
+                            <th>Description</th>
+                            <th>Visibility</th>
+                            <th>Tags</th>
+                            <th>Stars</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for repo in repositories %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if repo.is_official %}
+                                        <i class="fas fa-star text-warning me-2" title="Official Repository"></i>
+                                    {% endif %}
+                                    <div>
+                                        <a href="{% url 'repository_detail' repo.id %}" class="text-decoration-none fw-bold">
+                                            {{ repo.name }}
+                                        </a>
+                                        {% if repo.is_official %}
+                                            <br><small class="text-warning">Official Repository</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user me-1 text-muted"></i>
+                                    <span>{{ repo.owner.username }}</span>
+                                    {% if repo.owner.publisher_status != 'NONE' %}
+                                        <br><small class="text-info">{{ repo.owner.get_publisher_status_display }}</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if repo.description %}
+                                    <span title="{{ repo.description }}">{{ repo.description|truncatechars:50 }}</span>
+                                {% else %}
+                                    <span class="text-muted fst-italic">No description</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if repo.visibility == 'PRIVATE' %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-lock me-1"></i>Private
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-globe me-1"></i>Public
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ repo.tag_count }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-warning text-dark">{{ repo.star_count }}</span>
+                            </td>
+                            <td>
+                                <small title="{{ repo.updated_at }}">
+                                    {{ repo.updated_at|timesince }} ago
+                                </small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'repository_detail' repo.id %}" class="btn btn-outline-primary btn-sm" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'repository_edit' repo.id %}" class="btn btn-outline-secondary btn-sm" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" title="Delete"
+                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ repo.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Delete Confirmation Modal for each repo -->
+                        <div class="modal fade" id="deleteModal{{ repo.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ repo.id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="deleteModalLabel{{ repo.id }}">Delete Repository</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Are you sure you want to delete the repository <strong>{{ repo.name }}</strong> owned by <strong>{{ repo.owner.username }}</strong>?</p>
+                                        <div class="alert alert-warning" role="alert">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>Warning:</strong> This action cannot be undone. All {{ repo.tag_count }} tag{{ repo.tag_count|pluralize }} and data associated with this repository will be permanently deleted.
+                                        </div>
+                                        {% if repo.is_official %}
+                                        <div class="alert alert-danger" role="alert">
+                                            <i class="fas fa-star me-2"></i>
+                                            <strong>Official Repository:</strong> You are about to delete an official repository which may be used by many users.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <form method="post" action="{% url 'repository_delete' repo.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-trash me-1"></i>Delete Repository
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if repositories.has_other_pages %}
+    <nav aria-label="Repository pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if repositories.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if form.search.value %}search={{ form.search.value }}&{% endif %}{% if form.visibility.value %}visibility={{ form.visibility.value }}&{% endif %}{% if form.sort.value %}sort={{ form.sort.value }}&{% endif %}page={{ repositories.previous_page_number }}">Previous</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Previous</span>
+                </li>
+            {% endif %}
+
+            {% for num in repositories.paginator.page_range %}
+                {% if repositories.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                {% elif num > repositories.number|add:'-3' and num < repositories.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?{% if form.search.value %}search={{ form.search.value }}&{% endif %}{% if form.visibility.value %}visibility={{ form.visibility.value }}&{% endif %}{% if form.sort.value %}sort={{ form.sort.value }}&{% endif %}page={{ num }}">{{ num }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if repositories.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if form.search.value %}search={{ form.search.value }}&{% endif %}{% if form.visibility.value %}visibility={{ form.visibility.value }}&{% endif %}{% if form.sort.value %}sort={{ form.sort.value }}&{% endif %}page={{ repositories.next_page_number }}">Next</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Next</span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+{% else %}
+    <!-- Empty State -->
+    <div class="text-center py-5">
+        <div class="mb-4">
+            <i class="fas fa-boxes fa-4x text-muted"></i>
+        </div>
+        <h4 class="text-muted">No repositories found</h4>
+        {% if form.search.value or form.visibility.value %}
+            <p class="text-muted">Try adjusting your search criteria or <a href="{% url 'admin_repository_list' %}">clear filters</a>.</p>
+        {% else %}
+            <p class="text-muted">There are no repositories in the system yet.</p>
+            <a href="{% url 'repository_create' %}?official=true" class="btn btn-success">
+                <i class="fas fa-star me-1"></i>Create Official Repository
+            </a>
+        {% endif %}
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        color: #495057;
+        background-color: #f8f9fa;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .alert {
+        border-left: 4px solid #0d6efd;
+    }
+
+    .alert-warning {
+        border-left-color: #ffc107;
+    }
+
+    .alert-danger {
+        border-left-color: #dc3545;
+    }
+</style>
+{% endblock %}

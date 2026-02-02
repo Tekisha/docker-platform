@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if is_creating_official %}
+        Create Official Repository - DockerHub
+    {% else %}
+        Create Repository - DockerHub
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    {% if is_creating_official %}
+                        <i class="fas fa-star text-warning me-2"></i>Create Official Repository
+                    {% else %}
+                        <i class="fas fa-box me-2"></i>Create Repository
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body">
+                {% if is_creating_official %}
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Official Repository:</strong> This repository will be marked as official and will not have a username prefix. It will receive the "Docker Official Image" badge.
+                    </div>
+                {% endif %}
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- Repository Name -->
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">
+                            Repository Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.help_text %}
+                            <div class="form-text">{{ form.name.help_text }}</div>
+                        {% endif %}
+                        {% if form.name.errors %}
+                            {% for error in form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                        {% if not is_creating_official %}
+                            <div class="form-text">
+                                <strong>Full repository name:</strong> {{ user.username }}/<span id="repo-name-preview">your-repo-name</span>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                        {{ form.description }}
+                        {% if form.description.help_text %}
+                            <div class="form-text">{{ form.description.help_text }}</div>
+                        {% endif %}
+                        {% if form.description.errors %}
+                            {% for error in form.description.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <!-- Visibility -->
+                    <div class="mb-4">
+                        <label for="{{ form.visibility.id_for_label }}" class="form-label">
+                            Visibility <span class="text-danger">*</span>
+                        </label>
+                        {{ form.visibility }}
+                        {% if form.visibility.help_text %}
+                            <div class="form-text">{{ form.visibility.help_text }}</div>
+                        {% endif %}
+                        {% if form.visibility.errors %}
+                            {% for error in form.visibility.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Visibility explanation -->
+                        <div class="mt-2">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100">
+                                        <h6><i class="fas fa-globe text-success me-1"></i> Public</h6>
+                                        <small class="text-muted">
+                                            Anyone can discover and view this repository. You choose who can commit.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100">
+                                        <h6><i class="fas fa-lock text-secondary me-1"></i> Private</h6>
+                                        <small class="text-muted">
+                                            Only you can view and access this repository.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            {% if is_creating_official %}
+                                <i class="fas fa-star me-1"></i>Create Official Repository
+                            {% else %}
+                                <i class="fas fa-box me-1"></i>Create Repository
+                            {% endif %}
+                        </button>
+                        <a href="{% url 'repository_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+
+                <!-- Repository creation tips -->
+                <div class="mt-4 pt-4 border-top">
+                    <h6>Tips for creating a great repository:</h6>
+                    <ul class="small text-muted">
+                        <li>Choose a descriptive and unique name</li>
+                        <li>Add a clear description explaining what your image does</li>
+                        <li>Use semantic versioning for your tags (e.g., v1.0.0, v1.1.0)</li>
+                        <li>Keep your images lightweight and secure</li>
+                        <li>Consider making your repository public to help the community</li>
+                    </ul>
+                </div>
+
+                {% if can_create_official and not is_creating_official %}
+                <div class="mt-3">
+                    <div class="alert alert-light border" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Administrator Notice:</strong> You can also create 
+                        <a href="{% url 'repository_create' %}?official=true" class="alert-link">
+                            official repositories
+                        </a> that don't require a username prefix and receive special badges.
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update repository name preview
+    const nameInput = document.getElementById('{{ form.name.id_for_label }}');
+    const preview = document.getElementById('repo-name-preview');
+    
+    if (nameInput && preview) {
+        nameInput.addEventListener('input', function() {
+            const value = this.value.trim() || 'your-repo-name';
+            preview.textContent = value;
+        });
+    }
+    
+    // Form validation
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const nameInput = document.getElementById('{{ form.name.id_for_label }}');
+            if (nameInput && !nameInput.value.trim()) {
+                e.preventDefault();
+                nameInput.focus();
+                nameInput.classList.add('is-invalid');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

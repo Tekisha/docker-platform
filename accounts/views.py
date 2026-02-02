@@ -71,9 +71,9 @@ def explore(request):
 
 
 @repository_management_permission_required
-def repositories(request):
-    """User repositories management - for authenticated users"""
-    return render(request, 'todo.html', {'feature_name': 'Repository Management'})
+def redirect_to_repositories(request):
+    """Redirect to registry repository list"""
+    return redirect('repository_list')
 
 
 @analytics_permission_required

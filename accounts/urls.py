@@ -19,7 +19,7 @@ urlpatterns = [
     path("profile/", views_profile.profile, name="profile"),
     path("admin/create-admin/", views_create_admin.create_admin, name="create_admin"),
 
-    # Skeleton views
-    path("repositories/", views.repositories, name="repositories"),
+    # Redirect repositories to registry app
+    path("repositories/", views.redirect_to_repositories, name="repositories"),
     path("analytics/", views.analytics, name="analytics"),
 ]

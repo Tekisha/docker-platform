@@ -1,0 +1,305 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ repository.name }} - DockerHub{% endblock %}
+
+{% block content %}
+<!-- Repository Header -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">
+            {% if repository.is_official %}
+                <i class="fas fa-star text-warning me-2" title="Official Repository"></i>
+            {% endif %}
+            {{ repository.name }}
+        </h2>
+        <p class="text-muted mb-0">by {{ repository.owner.username }}</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        {% if can_star %}
+            {% if user_starred %}
+                <form method="post" action="{% url 'repo_unstar' repository.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-warning">
+                        <i class="fas fa-star me-1"></i>Starred
+                    </button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'repo_star' repository.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="far fa-star me-1"></i>Star
+                    </button>
+                </form>
+            {% endif %}
+        {% endif %}
+
+        {% if can_edit %}
+            <a href="{% url 'repository_edit' repository.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-1"></i>Edit
+            </a>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <i class="fas fa-trash me-1"></i>Delete
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Repository Info Cards -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">About this repository</h5>
+                {% if repository.description %}
+                    <p class="card-text">{{ repository.description }}</p>
+                {% else %}
+                    <p class="card-text text-muted fst-italic">No description provided</p>
+                {% endif %}
+
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Visibility</small>
+                        {% if repository.visibility == 'PRIVATE' %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-lock me-1"></i>Private
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-globe me-1"></i>Public
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Type</small>
+                        {% if repository.is_official %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-star me-1"></i>Docker Official Image
+                            </span>
+                        {% else %}
+                            <span class="badge bg-info">
+                                <i class="fas fa-user me-1"></i>User Repository
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Created</small>
+                        <span>{{ repository.created_at|date:"M d, Y" }}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Last Updated</small>
+                        <span>{{ repository.updated_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Repository Stats</h5>
+                <div class="row">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ tags.paginator.count }}</h4>
+                        <small class="text-muted">Tag{{ tags.paginator.count|pluralize }}</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-warning">{{ star_count }}</h4>
+                        <small class="text-muted">Star{{ star_count|pluralize }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tags Section -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Tags</h5>
+            <div class="text-muted">
+                <small>Tags are created automatically via docker push commands</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- Tags List -->
+        {% if tags %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Docker Pull Command</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tag in tags %}
+                        <tr>
+                            <td>
+                                <code class="bg-light px-2 py-1 rounded">{{ tag.name }}</code>
+                            </td>
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    {% if repository.is_official %}
+                                        <input type="text" class="form-control font-monospace" value="docker pull {{ repository.name }}:{{ tag.name }}" readonly id="tag-command-{{ tag.id }}">
+                                    {% else %}
+                                        <input type="text" class="form-control font-monospace" value="docker pull {{ repository.owner.username }}/{{ repository.name }}:{{ tag.name }}" readonly id="tag-command-{{ tag.id }}">
+                                    {% endif %}
+                                    <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('tag-command-{{ tag.id }}')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <span title="{{ tag.created_at }}">{{ tag.created_at|timesince }} ago</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if tags.has_other_pages %}
+            <nav aria-label="Tag pagination" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if tags.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ tags.previous_page_number }}">Previous</a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in tags.paginator.page_range %}
+                        {% if tags.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > tags.number|add:'-3' and num < tags.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if tags.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ tags.next_page_number }}">Next</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                <h6 class="text-muted">No tags found</h6>
+                <p class="text-muted">Tags will appear here when you push Docker images to this repository.</p>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <strong>To push your first image:</strong><br>
+                        {% if repository.is_official %}
+                            <code>docker tag your-image {{ repository.name }}:your-tag</code><br>
+                            <code>docker push {{ repository.name }}:your-tag</code>
+                        {% else %}
+                            <code>docker tag your-image {{ repository.owner.username }}/{{ repository.name }}:your-tag</code><br>
+                            <code>docker push {{ repository.owner.username }}/{{ repository.name }}:your-tag</code>
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Repository Modal -->
+{% if can_edit %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Delete Repository</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the repository <strong>{{ repository.name }}</strong>?</p>
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. All tags and data associated with this repository will be permanently deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'repository_delete' repository.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>Delete Repository
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Copy to clipboard function
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    element.setSelectionRange(0, 99999); // For mobile devices
+    navigator.clipboard.writeText(element.value).then(function() {
+        // Visual feedback
+        const button = element.nextElementSibling;
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check text-success"></i>';
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .font-monospace {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.9em;
+    }
+
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .input-group-sm .form-control {
+        font-size: 0.8em;
+    }
+
+    code {
+        font-size: 0.9em;
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .badge {
+        font-size: 0.8em;
+    }
+</style>
+{% endblock %}
