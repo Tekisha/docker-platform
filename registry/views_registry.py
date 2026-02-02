@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 import base64
 import json
 import logging
@@ -64,6 +65,7 @@ def docker_auth(request):
             # Format: "repository:name:actions"
             # (User): "repository:mika/web-app:pull,push"
             # (Official): "repository:ubuntu:pull,push"
+            scope_param = unquote(scope_param)
             typ, name, actions = scope_param.split(':')
             requested_actions = actions.split(',')
 
@@ -136,12 +138,12 @@ def docker_auth(request):
         'access': access_list,
         'jti': base64.urlsafe_b64encode(os.urandom(16)).decode('utf-8'),
     }
-    custom_headers = {'type': 'JWT', 'x5c': get_x5c_chain(), 'alg': 'RS256'}
+    custom_headers = {'typ': 'JWT', 'x5c': get_x5c_chain(), 'alg': 'RS256'}
 
     private_key = getattr(settings, 'REGISTRY_PRIVATE_KEY', '')
     token = jwt.encode(payload, private_key, algorithm='RS256', headers=custom_headers)
 
-    return JsonResponse({'token': token})
+    return JsonResponse({'token': token, 'access_token': token})
 
 
 @csrf_exempt
