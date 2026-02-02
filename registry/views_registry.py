@@ -8,7 +8,7 @@ import time
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.db.models import Q
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseNotAllowed
 from django.views.decorators.csrf import csrf_exempt
 from jose import jwt
 
@@ -39,6 +39,8 @@ def get_x5c_chain():
 @csrf_exempt
 def docker_auth(request):
     user = None
+    if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
     if 'HTTP_AUTHORIZATION' in request.META:
         auth = request.META['HTTP_AUTHORIZATION'].split()
         if len(auth) == 2 and auth[0].lower() == 'basic':
