@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 import time
 
@@ -11,6 +12,8 @@ from django.views.decorators.csrf import csrf_exempt
 from jose import jwt
 
 from .models import Repository, Tag
+
+logger = logging.getLogger(__name__)
 
 
 def get_x5c_chain():
@@ -65,7 +68,6 @@ def docker_auth(request):
             requested_actions = actions.split(',')
 
             repo = None
-            is_official_request = False
 
             parts = name.split('/')
 
@@ -84,8 +86,6 @@ def docker_auth(request):
 
             elif len(parts) == 1:
                 repo_name = parts[0]
-                is_official_request = True  # only official repos have single-part names
-
                 try:
                     repo = Repository.objects.get(name=repo_name, is_official=True)
                 except Repository.DoesNotExist:
@@ -146,22 +146,30 @@ def docker_auth(request):
 
 @csrf_exempt
 def registry_webhook(request):
+    logger.info(f"Registry webhook received: method={request.method}")
+
     if request.method != 'POST':
+        logger.warning(f"Invalid method for webhook: {request.method}")
         return HttpResponse(status=405)
 
     try:
-        data = json.loads(request.body)
+        body_text = request.body.decode('utf-8')
+
+        data = json.loads(body_text)
         events = data.get('events', [])
 
-        for event in events:
-            if event['action'] == 'push':
+        for i, event in enumerate(events):
+            action = event.get('action')
+
+            if action == 'push':
                 target = event['target']
-                full_name = target['repository']  # moze biti "mika/app" ili "ubuntu"
+                full_name = target['repository']  # can be "user/app" or "ubuntu"
                 tag_name = target.get('tag')
                 digest = target['digest']
                 size = target['size']
 
                 if not tag_name:
+                    logger.warning(f"Skipping event without tag name for repo {full_name}")
                     continue
 
                 parts = full_name.split('/')
@@ -169,24 +177,45 @@ def registry_webhook(request):
 
                 try:
                     if len(parts) == 2:
+                        # User repository: user/repo
                         repo = Repository.objects.get(
                             owner__username=parts[0], name=parts[1], is_official=False
                         )
+                        logger.info(f"Found user repository: {repo}")
                     elif len(parts) == 1:
+                        # Official repository: repo
                         repo = Repository.objects.get(name=parts[0], is_official=True)
+                        logger.info(f"Found official repository: {repo}")
+                    else:
+                        logger.warning(f"Invalid repository name format: {full_name}")
+                        continue
+
                 except Repository.DoesNotExist:
-                    print(f'Warning: Push received for unknown repo {full_name}')
+                    logger.warning(f"Repository not found in database: {full_name}")
                     continue
 
                 if repo:
-                    Tag.objects.update_or_create(
+                    tag, created = Tag.objects.update_or_create(
                         repository=repo,
                         name=tag_name,
                         defaults={'digest': digest, 'size': size},
                     )
-                    print(f'Updated tag: {repo} : {tag_name}')
+                    action_word = "Created" if created else "Updated"
+                    logger.info(f"{action_word} tag: {repo.name}:{tag_name}")
+                else:
+                    logger.error(f"Repository object is None for {full_name}")
+            else:
+                logger.info(f"Ignoring non-push event: {action}")
 
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in webhook body: {e}")
+        return HttpResponse('Invalid JSON', status=400)
+    except KeyError as e:
+        logger.error(f"Missing required field in webhook data: {e}")
+        return HttpResponse(f'Missing field: {e}', status=400)
     except Exception as e:
-        print(f'Webhook error: {e}')
+        logger.error(f"Unexpected webhook error: {e}", exc_info=True)
+        return HttpResponse('Internal server error', status=500)
 
+    logger.info("Webhook processed successfully")
     return HttpResponse('OK')

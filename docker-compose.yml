@@ -32,26 +32,20 @@ services:
 
     registry:
         image: registry:2
-        environment:
-            REGISTRY_AUTH: token
-            REGISTRY_AUTH_TOKEN_REALM: http://localhost/api/auth/token/
-            REGISTRY_AUTH_TOKEN_SERVICE: docker-platform-registry
-            REGISTRY_AUTH_TOKEN_ISSUER: docker-platform
-            REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE: /certs/jwt.crt
-
-            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_NAME: django-listener
-            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_URL: http://web:8000/api/webhooks/registry/
-            REGISTRY_NOTIFICATIONS_ENDPOINTS_0_HEADERS_Authorization: Basic whatever
-
-            REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+        container_name: scm_registry
         volumes:
             - registry-data:/var/lib/registry
             - ./certs:/certs
+            - ./registry-config.yml:/etc/docker/registry/config.yml:ro
+        ports:
+            - "5000:5000"
+            - "5001:5001"
         networks:
             - app_network
 
     nginx:
         image: nginx:latest
+        container_name: scm_nginx
         ports:
             - "80:80"
         volumes:
