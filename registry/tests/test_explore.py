@@ -133,10 +133,6 @@ def setup_test_data(db):
     }
 
 
-# ====================
-# Search Functionality Tests
-# ====================
-
 @pytest.mark.django_db
 class TestPublicSearch:
     """Test search_public_repositories function"""
@@ -204,9 +200,6 @@ class TestPublicSearch:
         assert results.first() == setup_test_data['repos']['verified']
 
 
-# ====================
-# Relevance Scoring Tests
-# ====================
 
 @pytest.mark.django_db
 class TestRelevanceScoring:
@@ -270,9 +263,6 @@ class TestRelevanceScoring:
         # Check that time_score is higher for recent repo
         assert recent_scored.time_score > old_scored.time_score
 
-# ====================
-# Badge Display Tests
-# ====================
 
 @pytest.mark.django_db
 class TestRepositoryBadges:
@@ -312,10 +302,6 @@ class TestRepositoryBadges:
         
         assert len(badges) == 0
 
-
-# ====================
-# Explore View Integration Tests
-# ====================
 
 @pytest.mark.django_db
 class TestExploreView:
