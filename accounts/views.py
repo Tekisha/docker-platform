@@ -4,7 +4,6 @@ from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
-
 from .forms import LoginForm, UserRegistrationForm
 from .models import User
 from .permissions import (
@@ -63,12 +62,6 @@ def register(request):
 def home(request):
     """Home page view - accessible to all users"""
     return render(request, 'home.html')
-
-
-def explore(request):
-    """Explore public repositories - accessible to all users"""
-    return render(request, 'todo.html', {'feature_name': 'Explore Repositories'})
-
 
 @repository_management_permission_required
 def redirect_to_repositories(request):
