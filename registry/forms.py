@@ -165,3 +165,28 @@ class RepositorySearchForm(forms.Form):
             'placeholder': 'Search repositories by name...'
         })
     )
+
+class PublicSearchForm(forms.Form):
+    q = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Search repositories...',
+            'class': 'form-control'
+        })
+    )
+
+    BADGE_CHOICES = [
+        ('OFFICIAL', 'Docker Official Image'),
+        ('VERIFIED', 'Verified Publisher'),
+        ('SPONSORED', 'Sponsored OSS'),
+    ]
+
+    badges = forms.MultipleChoiceField(
+        choices=BADGE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple(attrs={
+            'class': 'form-check-input'
+        }),
+        label='Filter by Badges'
+    )

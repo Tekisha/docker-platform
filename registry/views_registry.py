@@ -156,7 +156,6 @@ def docker_auth(request):
 @csrf_exempt
 def registry_webhook(request):
     logger.info(f"Registry webhook received: method={request.method}")
-
     if request.method != 'POST':
         logger.warning(f"Invalid method for webhook: {request.method}")
         return HttpResponse(status=405)
@@ -170,7 +169,7 @@ def registry_webhook(request):
         for i, event in enumerate(events):
             action = event.get('action')
 
-            if action == 'push':
+            if action == 'push' or action == 'pull':
                 target = event['target']
                 full_name = target['repository']  # can be "user/app" or "ubuntu"
                 tag_name = target.get('tag')
@@ -204,17 +203,22 @@ def registry_webhook(request):
                     continue
 
                 if repo:
-                    tag, created = Tag.objects.update_or_create(
-                        repository=repo,
-                        name=tag_name,
-                        defaults={'digest': digest, 'size': size},
-                    )
-                    action_word = "Created" if created else "Updated"
-                    logger.info(f"{action_word} tag: {repo.name}:{tag_name}")
+                    if action == 'push':
+                        tag, created = Tag.objects.update_or_create(
+                            repository=repo,
+                            name=tag_name,
+                            defaults={'digest': digest, 'size': size},
+                        )
+                        action_word = "Created" if created else "Updated"
+                        logger.info(f"{action_word} tag: {repo.name}:{tag_name}")
+                    else:
+                        repo.pull_count += 1
+                        repo.save()
+                        logger.info(f"Incremented pull count for {repo.name}: {repo.pull_count}")
                 else:
                     logger.error(f"Repository object is None for {full_name}")
             else:
-                logger.info(f"Ignoring non-push event: {action}")
+                logger.info(f"Ignoring non-push/pull event: {action}")
 
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in webhook body: {e}")

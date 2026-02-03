@@ -102,13 +102,25 @@
             <div class="card-body text-center">
                 <h5 class="card-title">Repository Stats</h5>
                 <div class="row">
-                    <div class="col-6">
+                    <div class="col-4">
                         <h4 class="text-primary">{{ tags.paginator.count }}</h4>
                         <small class="text-muted">Tag{{ tags.paginator.count|pluralize }}</small>
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
                         <h4 class="text-warning">{{ star_count }}</h4>
                         <small class="text-muted">Star{{ star_count|pluralize }}</small>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-info" title="Pull count: {{ repository.pull_count|default:0 }}">
+                            {% if repository.pull_count >= 1000000 %}
+                                {% widthratio repository.pull_count 1000000 1 %}M+
+                            {% elif repository.pull_count >= 1000 %}
+                                {% widthratio repository.pull_count 1000 1 %}K+
+                            {% else %}
+                                {{ repository.pull_count|default:0 }}
+                            {% endif %}
+                        </h4>
+                        <small class="text-muted">Pull{{ repository.pull_count|pluralize }}</small>
                     </div>
                 </div>
             </div>

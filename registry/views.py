@@ -13,8 +13,9 @@ from .forms import (
     RepositoryForm,
     OfficialRepositoryForm,
     RepositoryEditForm,
-    RepositorySearchForm
+    RepositorySearchForm, PublicSearchForm
 )
+from .utils import search_public_repositories, get_repository_badges, calculate_relevance_score
 
 
 @repository_management_permission_required
@@ -25,8 +26,7 @@ def repository_list(request):
 
     # Get user's repositories
     repositories = Repository.objects.filter(owner=user).select_related('owner').annotate(
-        tag_count=Count('tags'),
-        star_count=Count('stars')
+        tag_count=Count('tags')
     )
 
     # Apply simple search
@@ -91,7 +91,6 @@ def repository_create(request):
 
 @repository_management_permission_required
 def repository_detail(request, repo_id):
-    """View repository details"""
     repository = get_object_or_404(Repository, id=repo_id)
 
     # Check permissions - users can view their own repos, admins can view their own + official repos
@@ -103,28 +102,20 @@ def repository_detail(request, repo_id):
         messages.error(request, "You don't have permission to view this repository.")
         return redirect('repository_list')
 
-    # Get tags (simple listing, no advanced filtering)
-    tags = repository.tags.all().order_by('-created_at')
+    context = _get_repository_detail_context(repository, request)
+    return render(request, 'registry/repository_detail.html', context)
 
-    # Pagination for tags
-    paginator = Paginator(tags, 20)
-    page_number = request.GET.get('page')
-    tags_page = paginator.get_page(page_number)
 
-    # Check if user has starred this repository
-    user_starred = False
-    if request.user.is_authenticated and request.user.has_perm('accounts.can_star_repositories'):
-        user_starred = repository.stars.filter(user=request.user).exists()
+def public_repository_detail(request, repo_id):
+    repository = get_object_or_404(Repository, id=repo_id)
 
-    context = {
-        'repository': repository,
-        'tags': tags_page,
-        'user_starred': user_starred,
-        'can_edit': repository.owner == request.user or (request.user.has_perm('accounts.can_manage_official_repos') and repository.is_official),
-        'can_star': request.user.has_perm('accounts.can_star_repositories') and repository.owner != request.user,
-        'star_count': repository.stars.count(),
-    }
+    # Only allow viewing PUBLIC repositories
+    if repository.visibility != Repository.Visibility.PUBLIC:
+        messages.error(request, "This repository is private.")
+        return redirect('explore')
 
+    context = _get_repository_detail_context(repository, request)
+    context['is_public_view'] = True  # Flag to indicate this is public view
     return render(request, 'registry/repository_detail.html', context)
 
 
@@ -190,8 +181,7 @@ def admin_repository_list(request):
     repositories = Repository.objects.filter(
         Q(is_official=True)
     ).select_related('owner').annotate(
-        tag_count=Count('tags'),
-        star_count=Count('stars')
+        tag_count=Count('tags')
     )
 
     # Apply simple search
@@ -223,6 +213,39 @@ def admin_repository_list(request):
     return render(request, 'registry/admin_repository_list.html', context)
 
 
+def explore(request):
+    form = PublicSearchForm(request.GET or None)
+
+    query = None
+    badge_filters = []
+
+    if form.is_valid():
+        query = form.cleaned_data.get('q', '').strip()
+        badge_filters = form.cleaned_data.get('badges', [])
+
+    repositories = search_public_repositories(query=query, badge_filters=badge_filters)
+
+    repositories_with_scores = calculate_relevance_score(repositories)
+
+    for repo in repositories_with_scores:
+        repo.badges = get_repository_badges(repo)
+
+    paginator = Paginator(repositories_with_scores, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'form': form,
+        'repositories': page_obj,
+        'page_obj': page_obj,
+        'query': query,
+        'badge_filters': badge_filters,
+        'total_results': len(repositories_with_scores),
+    }
+
+    return render(request, 'explore.html', context)
+
+
 # Utility functions
 def get_repository_stats(user):
     """Get repository statistics for a user"""
@@ -232,4 +255,36 @@ def get_repository_stats(user):
         'public': repositories.filter(visibility='PUBLIC').count(),
         'private': repositories.filter(visibility='PRIVATE').count(),
         'official': repositories.filter(is_official=True).count(),
+    }
+
+
+def _get_repository_detail_context(repository, request):
+    tags = repository.tags.all().order_by('-created_at')
+
+    paginator = Paginator(tags, 20)
+    page_number = request.GET.get('page')
+    tags_page = paginator.get_page(page_number)
+
+    user_starred = False
+    if request.user.is_authenticated and request.user.has_perm('accounts.can_star_repositories'):
+        user_starred = repository.stars.filter(user=request.user).exists()
+
+    is_owner = request.user.is_authenticated and repository.owner == request.user
+    is_admin = request.user.is_authenticated and request.user.has_perm('accounts.can_manage_official_repos')
+    can_edit = is_owner or (is_admin and repository.is_official)
+    
+    can_star = (
+        request.user.is_authenticated and 
+        request.user.has_perm('accounts.can_star_repositories') and 
+        repository.owner != request.user
+    )
+
+    return {
+        'repository': repository,
+        'tags': tags_page,
+        'user_starred': user_starred,
+        'can_edit': can_edit,
+        'can_star': can_star,
+        'star_count': repository.star_count,
+        'is_owner': is_owner,
     }

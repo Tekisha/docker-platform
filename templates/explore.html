@@ -1,0 +1,331 @@
+{% extends 'base.html' %}
+
+{% block title %}Explore Repositories - DockerHub{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <i class="fas fa-search me-2"></i>Explore Repositories
+            </h2>
+        </div>
+    </div>
+
+    <!-- Search and Filter Form -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="get" action="{% url 'explore' %}" class="row g-3">
+                        <div class="col-md-7">
+                            <label for="id_q" class="form-label">Search</label>
+                            {{ form.q }}
+                            <small class="form-text text-muted">
+                                Search by repository name, description, or owner username
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label d-block mb-2">Filter by Badges</label>
+                            <div class="badge-filter-group d-flex flex-wrap gap-3">
+                                {% for value, label in form.badges.field.choices %}
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           name="badges" 
+                                           value="{{ value }}" 
+                                           id="badge_{{ value }}"
+                                           {% if value in badge_filters %}checked{% endif %}>
+                                    <label class="form-check-label" for="badge_{{ value }}">
+                                        {{ label }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                Search <i class="fas fa-search ms-1"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Repository Grid -->
+    <div class="row">
+        <div class="col-12">
+            {% if repositories %}
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for repo in repositories %}
+                <div class="col">
+                    <div class="card h-100 repo-card shadow-sm hover-shadow">
+                        <div class="card-body d-flex flex-column">
+                            <!-- Repository Name and Badges in flex container -->
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                <h6 class="card-title mb-0 flex-grow-1">
+                                    <a href="{% url 'public_repository_detail' repo_id=repo.id %}" class="text-decoration-none repo-link stretched-link">
+                                        {% if repo.is_official %}
+                                            {{ repo.name }}
+                                        {% else %}
+                                            {{ repo.owner.username }}/{{ repo.name }}
+                                        {% endif %}
+                                    </a>
+                                </h6>
+                                
+                                <!-- Badges -->
+                                {% if repo.badges %}
+                                <div class="badge-container-flex">
+                                    {% for badge in repo.badges %}
+                                    <span class="badge-text {{ badge.class }}">
+                                        {% if badge.type == 'official' %}
+                                            <i class="fas fa-certificate me-1"></i>
+                                        {% elif badge.type == 'verified' %}
+                                            <i class="fas fa-check-circle me-1"></i>
+                                        {% elif badge.type == 'sponsored' %}
+                                            <i class="fas fa-heart me-1"></i>
+                                        {% endif %}
+                                        {{ badge.label }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Description -->
+                            <p class="card-text text-muted small mb-3 flex-grow-1">
+                                {% if repo.description %}
+                                    {{ repo.description|truncatewords:15 }}
+                                {% else %}
+                                    <em>No description</em>
+                                {% endif %}
+                            </p>
+                            
+                            <!-- Stats -->
+                            <div class="repo-stats d-flex justify-content-between align-items-center text-muted small mt-auto">
+                                <div class="d-flex gap-3">
+                                    <span title="Star count">
+                                        <i class="fas fa-star text-warning"></i>
+                                        {{ repo.star_count_display|default:0 }}
+                                    </span>
+                                    <span title="Pull count: {{ repo.pull_count|default:0 }}">
+                                        <i class="fas fa-download"></i>
+                                        {% if repo.pull_count >= 1000000 %}
+                                            {% widthratio repo.pull_count 1000000 1 %}M+
+                                        {% elif repo.pull_count >= 1000 %}
+                                            {% widthratio repo.pull_count 1000 1 %}K+
+                                        {% else %}
+                                            {{ repo.pull_count|default:0 }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <small class="text-muted" title="Relevance score">
+                                    <i class="fas fa-chart-line"></i> {{ repo.relevance_score|floatformat:0 }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Repository pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if query %}q={{ query }}&{% endif %}{% if badge_filters %}{% for badge in badge_filters %}badges={{ badge }}&{% endfor %}{% endif %}page={{ page_obj.previous_page_number }}">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-chevron-left"></i> Previous</span>
+                        </li>
+                        {% endif %}
+
+                        <!-- Page numbers -->
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if query %}q={{ query }}&{% endif %}{% if badge_filters %}{% for badge in badge_filters %}badges={{ badge }}&{% endfor %}{% endif %}page={{ num }}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if query %}q={{ query }}&{% endif %}{% if badge_filters %}{% for badge in badge_filters %}badges={{ badge }}&{% endfor %}{% endif %}page={{ page_obj.next_page_number }}">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Next <i class="fas fa-chevron-right"></i></span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+                <!-- Page info -->
+                <div class="text-center text-muted mb-4">
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ total_results }} result{{ total_results|pluralize }}
+                </div>
+                {% endif %}
+
+            {% else %}
+                <!-- No results -->
+                <div class="alert alert-warning text-center py-5">
+                    <i class="fas fa-search fa-3x mb-3 text-muted"></i>
+                    <h4>No repositories found</h4>
+                    <p class="text-muted mb-0">
+                        {% if query or badge_filters %}
+                            Try adjusting your search criteria or <a href="{% url 'explore' %}">browse all repositories</a>.
+                        {% else %}
+                            There are no public repositories available yet.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Repository Cards */
+    .repo-card {
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .repo-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+        border-color: #0366d6;
+    }
+    
+    /* Make entire card clickable */
+    .repo-card .stretched-link::after {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1;
+        content: "";
+    }
+    
+    .repo-link {
+        color: #0366d6;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    
+    .repo-link:hover {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+    
+    /* Badge Container - Flex Layout */
+    .badge-container-flex {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        align-items: flex-end;
+        flex-shrink: 0;
+    }
+    
+    .badge-text {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        position: relative;
+        z-index: 10;
+    }
+    
+    .badge-text i {
+        font-size: 0.65rem;
+    }
+    
+    .badge-text.badge.bg-primary {
+        background-color: #0066cc !important;
+    }
+    
+    .badge-text.badge.bg-success {
+        background-color: #28a745 !important;
+    }
+    
+    .badge-text.badge.bg-info {
+        background-color: #17a2b8 !important;
+    }
+    
+    /* Card title - allow wrapping */
+    .card-title {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.4;
+        min-width: 0;
+    }
+    
+    /* Stats */
+    .repo-stats {
+        padding-top: 0.75rem;
+        border-top: 1px solid #e1e4e8;
+        font-size: 0.875rem;
+    }
+    
+    .repo-stats i {
+        margin-right: 0.25rem;
+    }
+    
+    /* Filter Checkboxes */
+    .badge-filter-group {
+        gap: 1rem !important;
+    }
+    
+    .form-check-inline {
+        margin-right: 0;
+    }
+    
+    .form-check-label {
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+    
+    /* Pagination */
+    .pagination .page-link {
+        color: #0366d6;
+    }
+    
+    .pagination .page-item.active .page-link {
+        background-color: #0366d6;
+        border-color: #0366d6;
+    }
+    
+    /* No results */
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+    }
+</style>
+{% endblock %}

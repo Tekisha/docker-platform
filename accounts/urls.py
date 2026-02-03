@@ -17,6 +17,7 @@ urlpatterns = [
     path("admin/users/", views_admin.admin_user_list, name="admin_user_list"),
     path("admin/users/<uuid:user_id>/publisher-status/", views_admin.set_publisher_status, name="set_publisher_status"),
     path("profile/", views_profile.profile, name="profile"),
+    path("profile/starred/", views_profile.starred_repositories, name="starred_repositories"),
     path("admin/create-admin/", views_create_admin.create_admin, name="create_admin"),
 
     # Redirect repositories to registry app

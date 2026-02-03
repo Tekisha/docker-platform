@@ -3,7 +3,10 @@ from django.urls import path
 from . import views, views_stars
 
 urlpatterns = [
-    # Repository management URLs
+    # Public repository view (accessible to all)
+    path('public/<uuid:repo_id>/', views.public_repository_detail, name='public_repository_detail'),
+    
+    # Repository management URLs (for owners)
     path('repositories/', views.repository_list, name='repository_list'),
     path('repositories/create/', views.repository_create, name='repository_create'),
     path(

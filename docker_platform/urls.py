@@ -18,7 +18,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
-from accounts.views import explore, home
+from accounts.views import home
+from registry.views import explore
 from registry.views_registry import docker_auth, registry_webhook
 
 urlpatterns = [

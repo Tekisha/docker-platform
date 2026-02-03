@@ -59,8 +59,12 @@
                     <a href="{% url 'repositories' %}" class="btn btn-outline-success">
                         <i class="fas fa-box"></i> Manage Repositories
                     </a>
+                    <a href="{% url 'starred_repositories' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-star"></i> Starred Repositories
+                        <span class="badge bg-secondary ms-2">{{ starred_count }}</span>
+                    </a>
                     {% if user_obj.is_admin %}
-                        <a href="{% url 'admin_user_list' %}" class="btn btn-outline-warning">
+                        <a href="{% url 'admin_user_list' %}" class="btn btn-outline-secondary">
                             <i class="fas fa-users"></i> Manage Users
                         </a>
                         <a href="{% url 'analytics' %}" class="btn btn-outline-danger">
