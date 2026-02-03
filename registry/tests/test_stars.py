@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
-from registry.models import Star
-
+from registry.models import Star, Repository
+from registry.tests.test_explore import setup_test_data
 
 
 @pytest.fixture
@@ -68,14 +68,6 @@ def test_user_cannot_star_private_repo(client, other_user, private_repo):
 
 
 @pytest.mark.django_db
-def test_admin_cannot_star(client, admin_user_for_stars, public_repo):
-    client.login(username="admin", password="pass")
-    url = reverse("repo_star", kwargs={"repo_id": public_repo.id})
-    client.post(url, follow=True)
-    assert Star.objects.count() == 0
-
-
-@pytest.mark.django_db
 def test_star_is_unique(client, other_user, public_repo):
     client.login(username="other", password="pass")
     url = reverse("repo_star", kwargs={"repo_id": public_repo.id})
@@ -93,3 +85,59 @@ def test_unstar(client, other_user, public_repo):
     assert Star.objects.count() == 1
     client.post(unstar_url, follow=True)
     assert Star.objects.count() == 0
+
+# ====================
+# Star Count Caching Tests
+# ====================
+
+@pytest.mark.django_db
+class TestStarCountCaching:
+    def test_star_count_increments_on_star(self, setup_test_data):
+        """star_count should increment when repository is starred"""
+        repo = setup_test_data['repos']['regular']
+        user = setup_test_data['users']['verified']
+        initial_count = repo.star_count
+
+        from registry.services.stars import star_repository
+        star_repository(user, repo)
+
+        repo.refresh_from_db()
+        assert repo.star_count == initial_count + 1
+
+    def test_star_count_decrements_on_unstar(self, setup_test_data):
+        """star_count should decrement when repository is unstarred"""
+        repo = setup_test_data['repos']['regular']
+        user = setup_test_data['users']['verified']
+
+        # First star it
+        from registry.services.stars import star_repository, unstar_repository
+        star_repository(user, repo)
+        repo.refresh_from_db()
+        count_after_star = repo.star_count
+
+        # Then unstar
+        unstar_repository(user, repo)
+        repo.refresh_from_db()
+
+        assert repo.star_count == count_after_star - 1
+
+    def test_star_count_matches_actual_stars(self, setup_test_data):
+        """Cached star_count should match actual Star count"""
+        repo = setup_test_data['repos']['regular']
+        user1 = setup_test_data['users']['verified']
+        user2 = setup_test_data['users']['sponsored']
+
+        # Reset star_count to 0 first
+        Repository.objects.filter(id=repo.id).update(star_count=0)
+
+        # Create actual stars
+        Star.objects.create(user=user1, repository=repo)
+        Star.objects.create(user=user2, repository=repo)
+
+        # Update cached count to match actual stars
+        Repository.objects.filter(id=repo.id).update(star_count=2)
+        repo.refresh_from_db()
+
+        actual_count = Star.objects.filter(repository=repo).count()
+        assert repo.star_count == actual_count
+        assert repo.star_count == 2

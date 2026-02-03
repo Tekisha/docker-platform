@@ -167,14 +167,18 @@ class TestWebhook:
         assert tag.digest == "sha256:new456"
         assert tag.size == 2000
 
-    def test_ignore_pull_events(self, repository):
-        """Test pull events are ignored"""
+    def test_pull_event_increments_pull_count(self, repository):
+        """Test that pull events increment repository pull_count"""
+        initial_count = repository.pull_count
+        
         factory = RequestFactory()
         pull_event = {
             "events": [
                 {
                     "action": "pull",
                     "target": {
+                        "digest": "sha256:existing123",
+                        "size": 1234,
                         "repository": "testuser/test-app",
                         "tag": "latest"
                     }
@@ -188,9 +192,74 @@ class TestWebhook:
 
         response = registry_webhook(request)
         assert response.status_code == 200
+        
+        # Check pull_count was incremented
+        repository.refresh_from_db()
+        assert repository.pull_count == initial_count + 1
 
-        # No tags should be created for pull events
-        assert not Tag.objects.filter(repository=repository).exists()
+    def test_pull_official_repo_increments_count(self, official_repository):
+        """Test pull event for official repository"""
+        initial_count = official_repository.pull_count
+        
+        factory = RequestFactory()
+        pull_event = {
+            "events": [
+                {
+                    "action": "pull",
+                    "target": {
+                        "digest": "sha256:ubuntu123",
+                        "size": 5678,
+                        "repository": "ubuntu",
+                        "tag": "22.04"
+                    }
+                }
+            ]
+        }
+
+        request = factory.post('/api/webhooks/registry/',
+                              data=json.dumps(pull_event),
+                              content_type='application/json')
+
+        response = registry_webhook(request)
+        assert response.status_code == 200
+        
+        # Check pull_count was incremented
+        official_repository.refresh_from_db()
+        assert official_repository.pull_count == initial_count + 1
+
+    def test_multiple_pulls_increment_correctly(self, repository):
+        """Test that multiple pull events increment pull_count correctly"""
+        initial_count = repository.pull_count
+        
+        factory = RequestFactory()
+        
+        # Send 3 pull events
+        for _ in range(3):
+            pull_event = {
+                "events": [
+                    {
+                        "action": "pull",
+                        "target": {
+                            "digest": "sha256:existing123",
+                            "size": 1234,
+                            "repository": "testuser/test-app",
+                            "tag": "latest"
+                        }
+                    }
+                ]
+            }
+            
+            request = factory.post('/api/webhooks/registry/',
+                                  data=json.dumps(pull_event),
+                                  content_type='application/json')
+            
+            response = registry_webhook(request)
+            assert response.status_code == 200
+        
+        # Check pull_count incremented by 3
+        repository.refresh_from_db()
+        assert repository.pull_count == initial_count + 3
+
 
     def test_push_unknown_repository(self):
         """Test push to unknown repository"""
