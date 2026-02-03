@@ -14,14 +14,23 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
-from django.urls import path, include
-from accounts.views import home, explore
+from django.urls import include, path
+
+from accounts.views import explore, home
+from registry.views_registry import docker_auth, registry_webhook
 
 urlpatterns = [
     path('', home, name='home'),
     path('explore/', explore, name='explore'),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
-    path("registry/", include("registry.urls")),
+    path('registry/', include('registry.urls')),
+    path('api/auth/token/', docker_auth, name='docker_auth'),
+    path(
+        'api/webhooks/registry/',
+        registry_webhook,
+        name='registry_webhook',
+    ),
 ]

@@ -146,3 +146,23 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# Use absolute path for certificates - works both locally and in Docker
+if os.path.exists('/app/certs'):
+    # Running in Docker container
+    CERT_DIR = '/app/certs'
+else:
+    # Running locally
+    CERT_DIR = os.path.join(BASE_DIR, 'certs')
+
+try:
+    with open(os.path.join(CERT_DIR, 'jwt.key'), 'r') as f:
+        REGISTRY_PRIVATE_KEY = f.read()
+    with open(os.path.join(CERT_DIR, 'jwt.crt'), 'r') as f:
+        REGISTRY_PUBLIC_CERTIFICATE = f.read()
+except FileNotFoundError:
+    print("WARNING: auth.key not found! Docker Auth will fail.")
+    REGISTRY_PRIVATE_KEY = ""
+    REGISTRY_PUBLIC_CERTIFICATE = ""
+
+REGISTRY_ISSUER = "docker-platform"
+REGISTRY_SERVICE = "docker-platform-registry"

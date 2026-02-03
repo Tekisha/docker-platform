@@ -30,6 +30,7 @@ class Tag(models.Model):
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="tags")
     name = models.CharField(max_length=128)
     digest = models.CharField(max_length=200, blank=True)
+    size = models.BigIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
