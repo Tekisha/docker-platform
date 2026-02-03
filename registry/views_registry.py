@@ -156,7 +156,6 @@ def docker_auth(request):
 @csrf_exempt
 def registry_webhook(request):
     logger.info(f"Registry webhook received: method={request.method}")
-    loggerr = logging.getLogger(__name__)
     if request.method != 'POST':
         logger.warning(f"Invalid method for webhook: {request.method}")
         return HttpResponse(status=405)

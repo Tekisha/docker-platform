@@ -12,18 +12,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Tell Django the field exists without running SQL (field already in database)
-        migrations.SeparateDatabaseAndState(
-            state_operations=[
-                migrations.AddField(
-                    model_name='repository',
-                    name='pull_count',
-                    field=models.IntegerField(default=0),
-                ),
-            ],
-            database_operations=[
-                # No SQL to execute - field already exists
-            ],
+        migrations.AddField(
+            model_name='repository',
+            name='pull_count',
+            field=models.IntegerField(default=0),
         ),
         migrations.AlterField(
             model_name='repository',
