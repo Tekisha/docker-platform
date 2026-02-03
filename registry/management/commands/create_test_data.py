@@ -250,6 +250,20 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f'  ✓ Added {star_count} stars'))
 
+        # Update star_count for all repositories
+        self.stdout.write('\n📊 Updating star_count for repositories...')
+        from django.db.models import Count
+        
+        updated_count = 0
+        for repo in Repository.objects.all():
+            actual_star_count = Star.objects.filter(repository=repo).count()
+            if repo.star_count != actual_star_count:
+                repo.star_count = actual_star_count
+                repo.save(update_fields=['star_count'])
+                updated_count += 1
+        
+        self.stdout.write(self.style.SUCCESS(f'  ✓ Updated star_count for {updated_count} repositories'))
+
         # Summary
         total_repos = Repository.objects.filter(visibility=Repository.Visibility.PUBLIC).count()
 

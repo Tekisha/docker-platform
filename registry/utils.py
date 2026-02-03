@@ -1,49 +1,67 @@
-import math
-from datetime import datetime, timedelta
 from django.utils import timezone
-from django.db.models import Count, Q
+from django.db.models import (
+    Count, Q, F, FloatField, Case, When, Value, 
+    ExpressionWrapper, Func
+)
+
+
+# Custom PostgreSQL functions for database-level calculations
+class Log10(Func):
+    function = 'LOG'
+    template = '%(function)s(10, %(expressions)s)'
+    output_field = FloatField()
+
+
+class Exp(Func):
+    function = 'EXP'
+    output_field = FloatField()
+
+
+class Extract(Func):
+    function = 'EXTRACT'
+    template = "%(function)s(EPOCH FROM %(expressions)s)"
+    output_field = FloatField()
 
 
 def calculate_relevance_score(repositories_queryset):
     now = timezone.now()
-    ninety_days_ago = now - timedelta(days=90)
     
-    repositories = repositories_queryset.annotate(
-        star_count=Count('stars', distinct=True)
-    )
-
-    repos_list = []
-    
-    for repo in repositories:
-        # 1. Pull and star count score (logarithmic)
-        pull_score = math.log10(repo.pull_count + 1) * 10
-        star_score = math.log10(repo.star_count + 1) * 12
-
+    return repositories_queryset.annotate(
+        pull_score=ExpressionWrapper(
+            Log10(F('pull_count') + 1) * 8,
+            output_field=FloatField()
+        ),
         
-        # 2. Badge boost
-        badge_score = 0
-        if repo.is_official:
-            badge_score = 40
-        elif hasattr(repo.owner, 'publisher_status'):
-            if repo.owner.publisher_status == 'VERIFIED_PUBLISHER':
-                badge_score = 30
-            elif repo.owner.publisher_status == 'SPONSORED_OSS':
-                badge_score = 20
+        star_score=ExpressionWrapper(
+            Log10(F('star_count') + 1) * 12,
+            output_field=FloatField()
+        ),
         
-        # 3. Time relevance boost
-        days = (now - repo.updated_at).days
-        time_score = 15 * math.exp(-days / 60)
+        badge_score=Case(
+            When(is_official=True, then=Value(40.0)),
+            When(owner__publisher_status='VERIFIED_PUBLISHER', then=Value(25.0)),
+            When(owner__publisher_status='SPONSORED_OSS', then=Value(15.0)),
+            default=Value(0.0),
+            output_field=FloatField()
+        ),
         
-        relevance_score = pull_score + star_score + badge_score + time_score
+        days_since_update=ExpressionWrapper(
+            Extract(Value(now) - F('updated_at')) / 86400.0,
+            output_field=FloatField()
+        ),
+        time_score=ExpressionWrapper(
+            15 * Exp(-F('days_since_update') / 60),
+            output_field=FloatField()
+        ),
         
-        # Store score with repo
-        repo.relevance_score = round(relevance_score, 2)
-        repo.star_count_display = repo.star_count
-        repos_list.append(repo)
-
-    repos_list.sort(key=lambda r: r.relevance_score, reverse=True)
-    
-    return repos_list
+        relevance_score=ExpressionWrapper(
+            F('pull_score') + F('star_score') + F('badge_score') + F('time_score'),
+            output_field=FloatField()
+        ),
+        
+        # Keep star count for display
+        star_count_display=F('star_count')
+    ).order_by('-relevance_score')
 
 
 def search_public_repositories(query=None, badge_filters=None):
@@ -51,7 +69,7 @@ def search_public_repositories(query=None, badge_filters=None):
     
     repositories = Repository.objects.filter(
         visibility=Repository.Visibility.PUBLIC
-    ).select_related('owner').prefetch_related('stars')
+    ).select_related('owner')
 
     if query:
         repositories = repositories.filter(

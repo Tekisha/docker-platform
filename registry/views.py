@@ -26,8 +26,7 @@ def repository_list(request):
 
     # Get user's repositories
     repositories = Repository.objects.filter(owner=user).select_related('owner').annotate(
-        tag_count=Count('tags'),
-        star_count=Count('stars')
+        tag_count=Count('tags')
     )
 
     # Apply simple search
@@ -182,8 +181,7 @@ def admin_repository_list(request):
     repositories = Repository.objects.filter(
         Q(is_official=True)
     ).select_related('owner').annotate(
-        tag_count=Count('tags'),
-        star_count=Count('stars')
+        tag_count=Count('tags')
     )
 
     # Apply simple search
@@ -287,6 +285,6 @@ def _get_repository_detail_context(repository, request):
         'user_starred': user_starred,
         'can_edit': can_edit,
         'can_star': can_star,
-        'star_count': repository.stars.count(),
+        'star_count': repository.star_count,
         'is_owner': is_owner,
     }

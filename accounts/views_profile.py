@@ -12,14 +12,12 @@ def profile(request):
     owned_repos = (
         Repository.objects
         .filter(owner=user)
-        .annotate(star_count=Count("stars"))
         .order_by("-created_at")
     )
 
     starred_repos = (
         Repository.objects
         .filter(stars__user=user)
-        .annotate(star_count=Count("stars"))
         .select_related("owner")
         .order_by("-stars__created_at")
         .distinct()
