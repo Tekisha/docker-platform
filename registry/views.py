@@ -119,20 +119,53 @@ def public_repository_detail(request, repo_id):
         return redirect('explore')
 
     cache_key = CacheKeys.repo_detail_public(repo_id)
-    context = cache.get(cache_key)
+    cached_data = cache.get(cache_key)
 
 
-    if context is None:
-        user_info = request.user.username if request.user.is_authenticated else "anonymous"
-        print(f"[CACHE MISS] Public repository detail: {repo_id} for {user_info}")
+    if cached_data is None:
+        print(f"[CACHE MISS] Public repository data: {repo_id}")
 
-        context = _get_repository_detail_context(repository, request)
-        context['is_public_view'] = True  # Flag to indicate this is public view
+        tags = repository.tags.all().order_by('-created_at')
 
-        cache.set(cache_key, context, settings.CACHE_TIMEOUT_REPO_DETAIL)
+        cached_data = {
+            'repository': repository,
+            'all_tags': list(tags),
+            'star_count': repository.star_count,
+        }
+
+        cache.set(cache_key, cached_data, settings.CACHE_TIMEOUT_REPO_DETAIL)
     else:
-        user_info = request.user.username if request.user.is_authenticated else "anonymous"
-        print(f"[CACHE HIT] Public repository detail: {repo_id} for {user_info}")
+        print(f"[CACHE HIT] Public repository data: {repo_id}")
+
+    is_authenticated = request.user.is_authenticated
+    is_owner = is_authenticated and repository.owner == request.user
+    is_admin = is_authenticated and request.user.has_perm('accounts.can_manage_official_repos')
+
+    can_edit = is_owner or (is_admin and repository.is_official)
+
+    can_star = (
+            is_authenticated and
+            request.user.has_perm('accounts.can_star_repositories') and
+            not is_owner
+    )
+
+    user_starred = False
+    if can_star:
+        user_starred = repository.stars.filter(user=request.user).exists()
+
+    paginator = Paginator(cached_data['all_tags'], 20)
+    page_number = request.GET.get('page')
+    tags_page = paginator.get_page(page_number)
+
+    context = {
+        'repository': cached_data['repository'],
+        'tags': tags_page,
+        'star_count': cached_data['star_count'],
+        'user_starred': user_starred,
+        'can_edit': can_edit,
+        'can_star': can_star,
+        'is_owner': is_owner,
+    }
 
     return render(request, 'registry/repository_detail.html', context)
 
