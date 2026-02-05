@@ -1,6 +1,3 @@
-"""
-Redis caching utilities for registry app
-"""
 from django.core.cache import cache
 from django_redis import get_redis_connection
 from .cache_keys import CacheKeys

@@ -4,25 +4,25 @@ class CacheKeys:
 
     @staticmethod
     def repo_detail_public(repo_id):
-        return f"scm:repo_detail_public:{repo_id}"
+        return f"repo_detail_public:{repo_id}"
 
     @staticmethod
     def repo_tags(repo_id):
-        return f"scm:repo_tags:{repo_id}"
+        return f"repo_tags:{repo_id}"
 
     # ==================== USER-SPECIFIC KEYS ====================
 
     @staticmethod
     def user_repo_list(user_id, search_query=""):
-        return f"scm:user:{user_id}:repositories:{search_query}"
+        return f"user:{user_id}:repositories:{search_query}"
 
     @staticmethod
     def user_starred(user_id):
-        return f"scm:user:{user_id}:starred"
+        return f"user:{user_id}:starred"
 
     @staticmethod
     def user_stats(user_id):
-        return f"scm:user:{user_id}:stats"
+        return f"user:{user_id}:stats"
 
     # ==================== EXPLORE KEYS ====================
 
@@ -30,7 +30,7 @@ class CacheKeys:
     def explore(query=None, badges=None):
         query_str = query if query else "None"
         badges_str = ":".join(sorted(badges)) if badges else ""
-        return f"scm:explore:q:{query_str}:badges:{badges_str}"
+        return f"explore:q:{query_str}:badges:{badges_str}"
 
 
     # ==================== INVALIDATION ====================
