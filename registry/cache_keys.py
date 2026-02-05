@@ -52,4 +52,4 @@ class CacheKeys:
 
     @staticmethod
     def get_explore_invalidation_pattern():
-        return "scm:explore:*"
+        return "scm:*:explore:*"
