@@ -51,66 +51,6 @@ def clear_cache():
     yield
     cache.clear()
 
-
-@pytest.mark.django_db
-def test_debug_redis_keys():
-    """DEBUG: Check actual Redis key format"""
-    from django_redis import get_redis_connection
-    from django.conf import settings
-
-    # Clear everything
-    cache.clear()
-
-    # Show settings
-    cache_config = settings.CACHES['default']
-    print(f"\n{'=' * 60}")
-    print(f"🔧 CACHE CONFIG:")
-    print(f"  LOCATION: {cache_config['LOCATION']}")
-    print(f"  KEY_PREFIX: {cache_config.get('KEY_PREFIX', 'NONE')}")
-    print(f"{'=' * 60}\n")
-
-    # Create a test key
-    test_key = CacheKeys.explore(query=None, badges=None)
-    print(f"🔑 Django key (logical): {test_key}")
-
-    cache.set(test_key, 'test_value', 600)
-    print(f"✅ Set cache key")
-
-    # Get direct Redis connection
-    redis_client = get_redis_connection("default")
-
-    # Show ALL keys in Redis
-    all_keys = list(redis_client.scan_iter(match='*', count=1000))
-    print(f"\n📦 ALL KEYS IN REDIS ({len(all_keys)} total):")
-    for key in all_keys:
-        print(f"  - {key}")
-
-    # Try to retrieve via Django
-    retrieved = cache.get(test_key)
-    print(f"\n✅ Retrieved via Django cache.get(): {retrieved}")
-
-    # Try pattern matching
-    patterns_to_try = [
-        'explore:*',
-        '*explore:*',
-        'test_*:explore:*',
-        '*:explore:*',
-    ]
-
-    print(f"\n🔍 PATTERN MATCHING TESTS:")
-    for pattern in patterns_to_try:
-        matched = list(redis_client.scan_iter(match=pattern, count=1000))
-        print(f"  Pattern '{pattern}' → {len(matched)} keys")
-        if matched:
-            for key in matched[:5]:  # Show first 5
-                print(f"    - {key}")
-
-    print(f"\n{'=' * 60}\n")
-
-    # Clean up
-    cache.clear()
-
-
 # ==================== CACHE KEYS TESTS ====================
 
 class TestCacheKeys:
