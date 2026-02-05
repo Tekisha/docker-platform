@@ -3,6 +3,10 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.views.decorators.http import require_POST
+from django.core.cache import cache
+from django.conf import settings
+from .cache_keys import CacheKeys
+
 
 from accounts.permissions import (
     repository_management_permission_required,
@@ -114,8 +118,22 @@ def public_repository_detail(request, repo_id):
         messages.error(request, "This repository is private.")
         return redirect('explore')
 
-    context = _get_repository_detail_context(repository, request)
-    context['is_public_view'] = True  # Flag to indicate this is public view
+    cache_key = CacheKeys.repo_detail_public(repo_id)
+    context = cache.get(cache_key)
+
+
+    if context is None:
+        user_info = request.user.username if request.user.is_authenticated else "anonymous"
+        print(f"[CACHE MISS] Public repository detail: {repo_id} for {user_info}")
+
+        context = _get_repository_detail_context(repository, request)
+        context['is_public_view'] = True  # Flag to indicate this is public view
+
+        cache.set(cache_key, context, settings.CACHE_TIMEOUT_REPO_DETAIL)
+    else:
+        user_info = request.user.username if request.user.is_authenticated else "anonymous"
+        print(f"[CACHE HIT] Public repository detail: {repo_id} for {user_info}")
+
     return render(request, 'registry/repository_detail.html', context)
 
 
@@ -137,6 +155,7 @@ def repository_edit(request, repo_id):
         form = RepositoryEditForm(request.POST, instance=repository)
         if form.is_valid():
             form.save()
+
             messages.success(request, f'Repository "{repository.name}" updated successfully!')
             return redirect('repository_detail', repo_id=repository.id)
     else:
@@ -223,12 +242,21 @@ def explore(request):
         query = form.cleaned_data.get('q', '').strip()
         badge_filters = form.cleaned_data.get('badges', [])
 
-    repositories = search_public_repositories(query=query, badge_filters=badge_filters)
+    cache_key = CacheKeys.explore(query, badge_filters)
+    repositories_with_scores = cache.get(cache_key)
 
-    repositories_with_scores = calculate_relevance_score(repositories)
+    if repositories_with_scores is None:
+        print(f"[CACHE MISS] Exploring: query='{query}', badges={badge_filters}")
+        repositories = search_public_repositories(query=query, badge_filters=badge_filters)
 
-    for repo in repositories_with_scores:
-        repo.badges = get_repository_badges(repo)
+        repositories_with_scores = calculate_relevance_score(repositories)
+
+        for repo in repositories_with_scores:
+            repo.badges = get_repository_badges(repo)
+
+        cache.set(cache_key, repositories_with_scores, settings.CACHE_TIMEOUT_EXPLORE)
+    else:
+        print(f"[CACHE HIT] Exploring: query='{query}', badges={badge_filters}")
 
     paginator = Paginator(repositories_with_scores, 20)
     page_number = request.GET.get('page', 1)
