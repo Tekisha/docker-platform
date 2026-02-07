@@ -72,7 +72,7 @@ def redirect_to_repositories(request):
 @analytics_permission_required
 def analytics(request):
     """Analytics view - for administrators only"""
-    return render(request, 'todo.html', {'feature_name': 'Analytics Dashboard'})
+    return render(request, 'analytics/analytics.html', {'feature_name': 'Analytics Dashboard'})
 
 
 class CustomLoginView(LoginView):
