@@ -43,6 +43,33 @@ LOGGING = {
     },
 }
 
+# ============== WORKER ISOLATION ==============
+WORKER_ID = os.environ.get('PYTEST_XDIST_WORKER', 'master')
+
+if WORKER_ID != 'master':
+    # Extract worker number from 'gw0', 'gw1', etc.
+    WORKER_NUM = int(WORKER_ID.replace('gw', ''))
+else:
+    WORKER_NUM = 0
+
 # Disable template caching for tests
 for template_engine in TEMPLATES:
     template_engine['OPTIONS']['debug'] = True
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': f'redis://{os.getenv("REDIS_HOST", "redis")}:6379/{WORKER_NUM}',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+        },
+        'KEY_PREFIX': f'test_{WORKER_ID}',
+        'TIMEOUT': 300,
+    }
+}

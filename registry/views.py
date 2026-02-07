@@ -3,6 +3,10 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.views.decorators.http import require_POST
+from django.core.cache import cache
+from django.conf import settings
+from .cache_keys import CacheKeys
+
 
 from accounts.permissions import (
     repository_management_permission_required,
@@ -114,8 +118,55 @@ def public_repository_detail(request, repo_id):
         messages.error(request, "This repository is private.")
         return redirect('explore')
 
-    context = _get_repository_detail_context(repository, request)
-    context['is_public_view'] = True  # Flag to indicate this is public view
+    cache_key = CacheKeys.repo_detail_public(repo_id)
+    cached_data = cache.get(cache_key)
+
+
+    if cached_data is None:
+        print(f"[CACHE MISS] Public repository data: {repo_id}")
+
+        tags = repository.tags.all().order_by('-created_at')
+
+        cached_data = {
+            'repository': repository,
+            'all_tags': list(tags),
+            'star_count': repository.star_count,
+        }
+
+        cache.set(cache_key, cached_data, settings.CACHE_TIMEOUT_REPO_DETAIL)
+    else:
+        print(f"[CACHE HIT] Public repository data: {repo_id}")
+
+    is_authenticated = request.user.is_authenticated
+    is_owner = is_authenticated and repository.owner == request.user
+    is_admin = is_authenticated and request.user.has_perm('accounts.can_manage_official_repos')
+
+    can_edit = is_owner or (is_admin and repository.is_official)
+
+    can_star = (
+            is_authenticated and
+            request.user.has_perm('accounts.can_star_repositories') and
+            not is_owner
+    )
+
+    user_starred = False
+    if can_star:
+        user_starred = repository.stars.filter(user=request.user).exists()
+
+    paginator = Paginator(cached_data['all_tags'], 20)
+    page_number = request.GET.get('page')
+    tags_page = paginator.get_page(page_number)
+
+    context = {
+        'repository': cached_data['repository'],
+        'tags': tags_page,
+        'star_count': cached_data['star_count'],
+        'user_starred': user_starred,
+        'can_edit': can_edit,
+        'can_star': can_star,
+        'is_owner': is_owner,
+    }
+
     return render(request, 'registry/repository_detail.html', context)
 
 
@@ -137,6 +188,7 @@ def repository_edit(request, repo_id):
         form = RepositoryEditForm(request.POST, instance=repository)
         if form.is_valid():
             form.save()
+
             messages.success(request, f'Repository "{repository.name}" updated successfully!')
             return redirect('repository_detail', repo_id=repository.id)
     else:
@@ -223,12 +275,21 @@ def explore(request):
         query = form.cleaned_data.get('q', '').strip()
         badge_filters = form.cleaned_data.get('badges', [])
 
-    repositories = search_public_repositories(query=query, badge_filters=badge_filters)
+    cache_key = CacheKeys.explore(query, badge_filters)
+    repositories_with_scores = cache.get(cache_key)
 
-    repositories_with_scores = calculate_relevance_score(repositories)
+    if repositories_with_scores is None:
+        print(f"[CACHE MISS] Exploring: query='{query}', badges={badge_filters}")
+        repositories = search_public_repositories(query=query, badge_filters=badge_filters)
 
-    for repo in repositories_with_scores:
-        repo.badges = get_repository_badges(repo)
+        repositories_with_scores = calculate_relevance_score(repositories)
+
+        for repo in repositories_with_scores:
+            repo.badges = get_repository_badges(repo)
+
+        cache.set(cache_key, repositories_with_scores, settings.CACHE_TIMEOUT_EXPLORE)
+    else:
+        print(f"[CACHE HIT] Exploring: query='{query}', badges={badge_filters}")
 
     paginator = Paginator(repositories_with_scores, 20)
     page_number = request.GET.get('page', 1)
