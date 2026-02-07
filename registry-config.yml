@@ -3,7 +3,7 @@ log:
   accesslog:
     disabled: false
   level: info
-  formatter: text
+  formatter: json
   fields:
     service: registry
     environment: production
