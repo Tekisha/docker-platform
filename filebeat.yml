@@ -33,11 +33,6 @@ filebeat.inputs:
       - ndjson:
           overwrite_keys: true
     processors:
-      - rename:
-          fields:
-            - from: "msg"
-              to: "message"
-          ignore_missing: true
       - add_fields:
           target: ''
           fields:
