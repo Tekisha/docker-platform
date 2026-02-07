@@ -79,8 +79,6 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'docker_platform.wsgi.application'
-
 # Logging
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -109,6 +107,10 @@ LOGGING = {
     },
 }
 
+
+WSGI_APPLICATION = 'docker_platform.wsgi.application'
+
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -122,6 +124,38 @@ DATABASES = {
         'PORT': os.getenv('POSTGRES_PORT', '5432'),
     }
 }
+
+# Redis configuration
+# https://medium.com/django-unleashed/caching-in-django-with-redis-a-step-by-step-guide-40e116cb4540
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+        },
+        'KEY_PREFIX': 'scm',
+        'TIMEOUT': 300,  # Default 5 minutes
+    }
+}
+
+# Session storage in Redis
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# Cache timeout settings
+CACHE_TIMEOUT_EXPLORE = 300  # 5 minutes
+CACHE_TIMEOUT_REPO_DETAIL = 600  # 10 minutes
+CACHE_TIMEOUT_USER_PROFILE = 300  # 5 minutes
+CACHE_TIMEOUT_SEARCH = 180  # 3 minutes
+CACHE_TIMEOUT_STATS = 60  # 1 minute
 
 
 # Password validation
