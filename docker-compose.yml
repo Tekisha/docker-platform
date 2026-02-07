@@ -4,9 +4,9 @@ services:
         container_name: scm_postgres
         restart: unless-stopped
         environment:
-            POSTGRES_DB: scm_db
-            POSTGRES_USER: scm_user
-            POSTGRES_PASSWORD: scm_pass
+            POSTGRES_DB: ${POSTGRES_DB} 
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} 
         ports:
             - "5432:5432"
         volumes:
@@ -47,6 +47,7 @@ services:
         volumes:
             - ./secrets:/app/secrets
             - ./certs:/app/certs
+            - ./logs/django:/app/logs
         depends_on:
           db:
             condition: service_healthy
@@ -59,9 +60,12 @@ services:
         image: registry:2
         container_name: scm_registry
         volumes:
+            - ./logs/registry:/var/log/registry
             - registry-data:/var/lib/registry
             - ./certs:/certs
             - ./registry-config.yml:/etc/docker/registry/config.yml:ro
+        command: >
+            sh -c "registry serve /etc/docker/registry/config.yml 2>&1 | tee -a /var/log/registry/registry.log"
         ports:
             - "5000:5000"
             - "5001:5001"
@@ -75,9 +79,55 @@ services:
             - "80:80"
         volumes:
             - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./logs/nginx:/var/log/nginx
         depends_on:
             - web
             - registry
+        networks:
+            - app_network
+
+    elasticsearch:
+        image: elasticsearch:9.3.0
+        container_name: elasticsearch
+        environment:
+            - discovery.type=single-node
+            - xpack.security.enabled=false
+            - ELASTIC_PASSWORD=elastic
+        ports:
+            - "9200:9200"
+        volumes:
+            - es-data:/usr/share/elasticsearch/data
+        depends_on:
+            - web
+        networks:
+            - app_network
+
+    filebeat:
+        container_name: filebeat
+        image: elastic/filebeat:9.2.5
+        volumes:
+            - ./logs/registry:/var/log/registry
+            - ./logs/django:/var/log/django
+            - ./logs/nginx:/var/log/nginx
+            - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+            - filebeat-data:/usr/share/filebeat/data
+        depends_on:
+            - elasticsearch
+        networks:
+            - app_network
+
+    kibana:
+        image: kibana:9.3.0
+        container_name: kibana
+        environment:
+            - TELEMETRY_ENABLED=false
+            - TELEMETRY_OPTIN=false
+            - NEWSFEED_ENABLED=false
+            - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+        ports:
+            - "5601:5601"
+        depends_on:
+            - elasticsearch
         networks:
             - app_network
 
@@ -87,4 +137,6 @@ networks:
 volumes:
     postgres_data:
     registry-data:
+    es-data:
+    filebeat-data:
     redis_data:
