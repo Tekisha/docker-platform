@@ -28,6 +28,16 @@ jobs:
                     --health-timeout=5s
                     --health-retries=5
 
+            redis:
+                image: redis:7-alpine
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd="redis-cli ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
         env:
             SECRET_KEY: django-insecure-test-key-for-github-actions
             DEBUG: True
@@ -40,6 +50,8 @@ jobs:
             SUPERADMIN_USERNAME: superadmin
             SUPERADMIN_EMAIL: admin@test.com
             SUPERADMIN_PASS_FILE: /tmp/superadmin_password.txt
+            REDIS_HOST: localhost
+            REDIS_URL: redis://localhost:6379/0
 
         steps:
             - name: Checkout repository
