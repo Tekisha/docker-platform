@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}Starred Repositories - DockerHub{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-star text-warning"></i> Starred Repositories</h2>
+                <a href="{% url 'profile' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Profile
+                </a>
+            </div>
+            <p class="text-muted">Repositories you've starred</p>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="row mb-4">
+        <div class="col-12 col-md-6">
+            <form method="get" action="{% url 'starred_repositories' %}">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        name="q" 
+                        class="form-control" 
+                        placeholder="Search your starred repositories..."
+                        value="{{ query }}"
+                    >
+                    <button class="btn btn-primary" type="submit">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    {% if query %}
+                        <a href="{% url 'starred_repositories' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if repositories %}
+        <!-- Repository Grid -->
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+            {% for repo in repositories %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm repo-card">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">
+                                    <a href="{% url 'public_repository_detail' repo.id %}" class="text-decoration-none text-primary stretched-link">
+                                        {{ repo.owner.username }}/{{ repo.name }}
+                                    </a>
+                                </h5>
+                            </div>
+
+                            <!-- Badges -->
+                            <div class="mb-2">
+                                {% if repo.is_official %}
+                                    <span class="badge bg-primary me-1">
+                                        <i class="fas fa-check-circle"></i> Official
+                                    </span>
+                                {% endif %}
+                                {% if repo.owner.publisher_status == 'VERIFIED_PUBLISHER' %}
+                                    <span class="badge bg-info me-1">
+                                        <i class="fas fa-certificate"></i> Verified
+                                    </span>
+                                {% endif %}
+                                {% if repo.owner.publisher_status == 'SPONSORED_OSS' %}
+                                    <span class="badge bg-success me-1">
+                                        <i class="fas fa-heart"></i> OSS
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Description -->
+                            <p class="card-text text-muted small mb-2 flex-grow-1">
+                                {{ repo.description|default:"No description"|truncatewords:15 }}
+                            </p>
+
+                            <!-- Stats -->
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span title="Stars">
+                                    <i class="fas fa-star text-warning"></i> {{ repo.star_count }}
+                                </span>
+                                <span title="Pulls">
+                                    <i class="fas fa-download text-primary"></i>
+                                    {% if repo.pull_count >= 1000000 %}
+                                        {{ repo.pull_count|floatformat:"0"|slice:"-7:-6" }}M+
+                                    {% elif repo.pull_count >= 1000 %}
+                                        {{ repo.pull_count|floatformat:"0"|slice:"-4:-3" }}K+
+                                    {% else %}
+                                        {{ repo.pull_count }}
+                                    {% endif %}
+                                </span>
+                                <span title="Updated">
+                                    <i class="fas fa-clock"></i> {{ repo.updated_at|timesince }} ago
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if query %}&q={{ query }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <p class="text-center text-muted">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} 
+                ({{ page_obj.paginator.count }} repositories)
+            </p>
+        {% endif %}
+    {% else %}
+        <!-- Empty State -->
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    {% if query %}
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h4>No Results Found</h4>
+                        <p class="text-muted">No starred repositories match "{{ query }}"</p>
+                        <a href="{% url 'starred_repositories' %}" class="btn btn-primary">
+                            <i class="fas fa-times"></i> Clear Search
+                        </a>
+                    {% else %}
+                        <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                        <h4>No Starred Repositories</h4>
+                        <p class="text-muted">You haven't starred any repositories yet.</p>
+                        <a href="{% url 'explore' %}" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Explore Repositories
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .repo-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+    .repo-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
+{% endblock %}
+{% endblock %}

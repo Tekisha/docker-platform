@@ -1,0 +1,47 @@
+filebeat.inputs:
+  - type: filestream
+    id: django-logs
+    name: django 
+    paths:
+      - /var/log/django/*.log
+    parsers:
+      - ndjson:
+          overwrite_keys: true
+    processors:
+      - add_fields:
+          target: ''
+          fields:
+            service: django
+
+  - type: filestream
+    id: nginx-logs
+    name: nginx 
+    paths:
+      - /var/log/nginx/*.log
+    processors:
+      - add_fields:
+          target: ''
+          fields:
+            service: nginx 
+
+  - type: filestream
+    id: registry-logs
+    name: registry 
+    paths:
+      - /var/log/registry/*.log
+    parsers:
+      - ndjson:
+          overwrite_keys: true
+    processors:
+      - add_fields:
+          target: ''
+          fields:
+            service: registry 
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "logs-%{+yyyy.MM.dd}"
+
+setup.template.enabled: true
+setup.template.name: "logs"
+setup.template.pattern: "logs-*"

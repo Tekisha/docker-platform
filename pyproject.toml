@@ -1,0 +1,12 @@
+[tool.pyright]
+venvPath = "."
+venv = "venv"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
+reportArgumentType="hint"
+reportAssignmentType="hint"
+[tool.ty.environment]
+python = "./venv"
+
+[tool.ruff.format]
+quote-style = "single"
