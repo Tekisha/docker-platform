@@ -79,7 +79,7 @@ jobs:
         runs-on: ubuntu-latest
 
         permissions:
-            contents: read
+            contents: write
             packages: write
 
         steps:
@@ -126,3 +126,4 @@ jobs:
                   name: Release ${{ github.ref_name }}
                   draft: false
                   prerelease: false
+
